@@ -1,24 +1,37 @@
--- Class translations for Classic Era
-CLASS_TRANSLATIONS = {
-    ["Warrior"] = "WARRIOR",
-    ["Paladin"] = "PALADIN",
-    ["Hunter"] = "HUNTER",
-    ["Rogue"] = "ROGUE",
-    ["Priest"] = "PRIEST",
-    ["Shaman"] = "SHAMAN",
-    ["Mage"] = "MAGE",
-    ["Warlock"] = "WARLOCK",
-    ["Druid"] = "DRUID",
-}
+-- utils.lua
+-- Helper functions for PSK
 
--- Check if a player is in your current raid group
-function IsInRaidWith(name)
-    name = name:lower()
-    for i = 1, GetNumGroupMembers() do
-        local unit = "raid" .. i
-        if UnitExists(unit) and UnitName(unit):lower() == name then
-            return true
-        end
+-- Move player up in current list
+function MovePlayerUp(index)
+    local list = PSKDB[PSKCurrentList]
+    if not list or not list[index] then return end
+    if index > 1 then
+        list[index], list[index - 1] = list[index - 1], list[index]
     end
-    return false
+end
+
+-- Move player down in current list
+function MovePlayerDown(index)
+    local list = PSKDB[PSKCurrentList]
+    if not list or not list[index] then return end
+    if index < #list then
+        list[index], list[index + 1] = list[index + 1], list[index]
+    end
+end
+
+-- Award selected player
+function AwardPlayer(index)
+    local list = PSKDB[PSKCurrentList]
+    if not list or not list[index] then return end
+
+    local player = list[index]
+    table.remove(list, index)
+    table.insert(list, player)
+
+    SendChatMessage("PSK: Awarded to " .. player .. "!", "GUILD")
+end
+
+-- Pass action
+function PassPlayer()
+    -- Selection clears automatically
 end

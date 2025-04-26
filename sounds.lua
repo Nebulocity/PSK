@@ -1,4 +1,6 @@
--- Play random Peon sounds for refresh fun
+-- sounds.lua
+-- Play random Peon sounds
+
 function PlayRandomPeonSound()
     local normalSounds = {
         "Sound\\Creature\\Peon\\PeonYes1.ogg",

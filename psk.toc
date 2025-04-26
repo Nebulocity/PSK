@@ -1,26 +1,17 @@
 ## Interface: 11505
 ## Title: PSK - Perchance Some Loot?
-## Notes: Tracks guildies for loot rolling
+## Notes: Toot tracking and guild roster manager for Perchance (Nightslayer-US)
 ## Version: 1.0
-## Author: You!
+## Author: Taurbucks
 ## SavedVariables: PSKDB, PSKMinimapDB
 
 media\icon.tga
 
+import.lua
 core.lua
 utils.lua
 sounds.lua
-ui.lua
 guild.lua
+ui.lua
 minimap.lua
-
-
-
---Ideas:
--- >>>> Make the highlight a little brighter?
--- Options menu
--- Search bar (class, name, ?)
--- More randomized sounds
--- Class-colored borders around icons
--- Custom background behind the scroll area
--- Minimap right-click options: open guild list, force refresh, settings
+psk.lua
