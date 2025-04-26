@@ -1,10 +1,12 @@
--- Draws level-60 guildies with class icon + name, plus a hover outline.
+-- guild.lua
+-- Draws level-60 guild members as class icon + name,
+-- with a bright, pulsing full-width outline on hover.
 
--- SaveGuildMembers: keep only level-60 entries in PSKDB
+
+-- SaveGuildMembers: keep only level-60 entries
 function SaveGuildMembers()
     if not IsInGuild() then return end
-
-    wipe(PSKDB)  -- clear out old entries
+    wipe(PSKDB)  -- clear out any old entries
 
     local total = GetNumGuildMembers()
     for i = 1, total do
@@ -24,23 +26,25 @@ function SaveGuildMembers()
 end
 
 
--- UpdateNameList: draw icon + name, with hover outline
+-- UpdateNameList: draw icon + name with pulsing outline
 function UpdateNameList()
     -- Layout constants
     local ROW_HEIGHT  = 20
     local ROW_PADDING = 4
     local ROW_SPACING = ROW_HEIGHT + ROW_PADDING
+	local OUTLINE_THICKNESS = 2
+	local OUTLINE_PADDING  = 8   -- ↑ make this bigger for a taller outline
 
-    -- Make sure our list frame is above the scroll-frame artwork
+    -- Make sure our scroll-child sits above the template art
     playerFrame:SetFrameLevel(scrollFrame:GetFrameLevel() + 1)
 
-    -- Wipe old rows completely
+    -- Completely remove old rows
     for _, child in ipairs({ playerFrame:GetChildren() }) do
         child:Hide()
         child:SetParent(nil)
     end
 
-    -- Build & sort entries
+    -- Build & sort the list of level-60 members
     local entries = {}
     for name, data in pairs(PSKDB) do
         table.insert(entries, {
@@ -67,19 +71,6 @@ function UpdateNameList()
         local inRaid   = IsInRaidWith(name)
         local color    = RAID_CLASS_COLORS[token] or { r=1, g=1, b=1 }
 
-        -- Hover-outline (full-width)
-        local highlight = CreateFrame("Frame", nil, playerFrame, "BackdropTemplate")
-        highlight:SetFrameLevel(playerFrame:GetFrameLevel() + 1)
-        highlight:SetBackdrop({
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 2,
-            insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-        })
-        highlight:SetBackdropBorderColor(color.r, color.g, color.b, 0.8)
-        highlight:SetPoint("TOPLEFT",     playerFrame, "TOPLEFT",   -2, yOffset + 2)
-        highlight:SetPoint("BOTTOMRIGHT", playerFrame, "TOPRIGHT",   2, yOffset - ROW_HEIGHT - 2)
-        highlight:Hide()
-
         -- Class icon
         local icon = playerFrame:CreateTexture(nil, "ARTWORK")
         icon:SetSize(16, 16)
@@ -98,15 +89,52 @@ function UpdateNameList()
         fs:SetPoint("LEFT", icon, "RIGHT", 5, 0)
         fs:SetText(name)
         if isOnline then
-            fs:SetTextColor(inRaid and 0 or 1, 1, inRaid and 0 or 0)
+            if inRaid then
+                fs:SetTextColor(0, 1, 0)  -- green
+            else
+                fs:SetTextColor(1, 1, 0)  -- yellow
+            end
         else
-            fs:SetTextColor(0.5, 0.5, 0.5)
+            fs:SetTextColor(0.5, 0.5, 0.5) -- gray
         end
         fs:Show()
+
+        -- Hover-outline frame (2px thick, full-width, pulsing)
+        local highlight = CreateFrame("Frame", nil, playerFrame, "BackdropTemplate")
+		highlight:SetFrameLevel(playerFrame:GetFrameLevel() + 1)
+		highlight:SetBackdrop({
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			edgeSize = OUTLINE_THICKNESS,
+			insets   = {
+				left   = OUTLINE_PADDING,
+				right  = OUTLINE_PADDING,
+				top    = OUTLINE_PADDING,
+				bottom = OUTLINE_PADDING,
+			},
+		})
+		highlight:SetBackdropBorderColor(color.r, color.g, color.b, 1.0)
+
+		-- Anchor to icon + name, but with larger vertical padding
+		highlight:SetPoint("TOPLEFT",     icon, "TOPLEFT",     -OUTLINE_PADDING,  OUTLINE_PADDING)
+		highlight:SetPoint("BOTTOMRIGHT", fs,   "BOTTOMRIGHT",    OUTLINE_PADDING, -OUTLINE_PADDING)
+		highlight:Hide()
+
+        -- Build the pulse animation for the highlight
+        do
+            local pulse = highlight:CreateAnimationGroup()
+            pulse:SetLooping("BOUNCE")
+            local alphaAnim = pulse:CreateAnimation("Alpha")
+            alphaAnim:SetFromAlpha(0.4)
+            alphaAnim:SetToAlpha(1.0)
+            alphaAnim:SetDuration(1.0)
+            alphaAnim:SetSmoothing("IN_OUT")
+            highlight.pulse = pulse
+        end
 
         -- Hover & tooltip handlers
         local function onEnter()
             highlight:Show()
+            highlight.pulse:Play()
             GameTooltip:SetOwner(fs, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
             GameTooltip:AddLine(name, 1, 1, 1)
@@ -116,6 +144,7 @@ function UpdateNameList()
             GameTooltip:Show()
         end
         local function onLeave()
+            highlight.pulse:Stop()
             highlight:Hide()
             GameTooltip_Hide()
         end
@@ -127,21 +156,20 @@ function UpdateNameList()
         fs:SetScript("OnEnter", onEnter)
         fs:SetScript("OnLeave", onLeave)
 
-        -- Move down for next row
+        -- Move down for the next row
         yOffset = yOffset - ROW_SPACING
     end
 
-    -- Show & size the scroll‐child
+    -- Show & size the scroll-child frame
     playerFrame:Show()
     playerFrame:SetSize(260, math.max(#entries * ROW_SPACING, 400))
 end
 
 
--- RefreshRoster: request a fresh roster
+-- RefreshRoster: request a fresh roster when clicked
 function RefreshRoster()
     if not IsInGuild() then return end
-
     PlayRandomPeonSound()
     PSKRequestedRoster = true
-    GuildRoster()  -- triggers GUILD_ROSTER_UPDATE → Save + UpdateNameList
+    GuildRoster()  -- will fire GUILD_ROSTER_UPDATE → Save + UpdateNameList
 end
