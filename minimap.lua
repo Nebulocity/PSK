@@ -1,3 +1,4 @@
+-- Setup minimap button using LibDataBroker and LibDBIcon
 local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
 if ldb then
     local dataObject = ldb:NewDataObject("PSK", {

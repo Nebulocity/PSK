@@ -1,17 +1,16 @@
--- Play a random Peon voice line
+-- Play random Peon sounds for refresh fun
 function PlayRandomPeonSound()
     local normalSounds = {
-        "Sound\\Creature\\Peon\\PeonYes1.ogg", -- "Work work."
-        "Sound\\Creature\\Peon\\PeonYes2.ogg", -- "Zug zug."
+        "Sound\\Creature\\Peon\\PeonYes1.ogg",
+        "Sound\\Creature\\Peon\\PeonYes2.ogg",
     }
     local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg" -- "Me not that kind of orc!"
 
     if math.random(1, 100) <= 5 then
         PlaySoundFile(rareSound)
-        return true -- Rare triggered!
+        return true
     else
-        local randomIndex = math.random(1, #normalSounds)
-        PlaySoundFile(normalSounds[randomIndex])
+        PlaySoundFile(normalSounds[math.random(1, #normalSounds)])
         return false
     end
 end

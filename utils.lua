@@ -1,20 +1,17 @@
--- Class translations (localized to token names)
+-- Class translations for Classic Era
 CLASS_TRANSLATIONS = {
     ["Warrior"] = "WARRIOR",
     ["Paladin"] = "PALADIN",
     ["Hunter"] = "HUNTER",
     ["Rogue"] = "ROGUE",
     ["Priest"] = "PRIEST",
-    ["Death Knight"] = "DEATHKNIGHT",
     ["Shaman"] = "SHAMAN",
     ["Mage"] = "MAGE",
     ["Warlock"] = "WARLOCK",
-    ["Monk"] = "MONK",
     ["Druid"] = "DRUID",
-    ["Demon Hunter"] = "DEMONHUNTER",
 }
 
--- Check if a player is in your raid group
+-- Check if a player is in your current raid group
 function IsInRaidWith(name)
     name = name:lower()
     for i = 1, GetNumGroupMembers() do
