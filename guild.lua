@@ -1,58 +1,61 @@
--- guild.lua
--- Save guild roster separately
+-- Guild + Bidding Events for PSK
 
-function CountGuildLevel60s()
-    local total60 = 0
-    local online60 = 0
-
-    if not IsInGuild() then
-        return total60, online60
-    end
-
-    for i = 1, GetNumGuildMembers() do
-        local name, _, _, level, _, _, _, _, online = GetGuildRosterInfo(i)
-        if name and level == 60 then
-            total60 = total60 + 1
-            if online then
-                online60 = online60 + 1
-            end
-        end
-    end
-
-    return total60, online60
-end
-
-
+-- SaveGuildMembers: save level 60s
 function SaveGuildMembers()
-    print("PSK: SaveGuildMembers called.")
-
     if not IsInGuild() then return end
-
-    if not PSKDB.roster then
-        PSKDB.roster = {}
-    end
-
-    wipe(PSKDB.roster)
+    wipe(PSKDB)
 
     local total = GetNumGuildMembers()
     for i = 1, total do
         local name, _, _, level, classFileName, _, _, _, online = GetGuildRosterInfo(i)
-        if name then
+        if name and level == 60 then
             name = Ambiguate(name, "short")
-            if level == 60 then
-                PSKDB.roster[name] = {
-                    class = classFileName,
-                    online = online,
-                    seen = date("%Y-%m-%d %H:%M"),
-                }
-            end
+            local token = classFileName and string.upper(classFileName) or "UNKNOWN"
+            PSKDB[name] = {
+                class  = token,
+                online = online,
+                seen   = date("%Y-%m-%d %H:%M"),
+            }
         end
     end
 end
 
+-- Refresh Roster
 function RefreshRoster()
     if not IsInGuild() then return end
-    PlayRandomPeonSound()
-    PSKRequestedRoster = true
     GuildRoster()
 end
+
+-- Chat Event: Auto-detect "bid" in raid chat
+local bidEventFrame = CreateFrame("Frame")
+bidEventFrame:RegisterEvent("CHAT_MSG_RAID")
+bidEventFrame:RegisterEvent("CHAT_MSG_GUILD")
+bidEventFrame:RegisterEvent("CHAT_MSG_RAID_WARNING")
+
+bidEventFrame:SetScript("OnEvent", function(_, event, msg, sender)
+    if not msg or not sender then return end
+    msg = string.lower(msg)
+
+    if msg:find("bid") then
+        sender = Ambiguate(sender, "short")
+
+        if not PSKBidList then PSKBidList = {} end
+
+        -- Check if already in the bid list
+        for _, name in ipairs(PSKBidList) do
+            if name == sender then
+                return -- already exists
+            end
+        end
+
+        table.insert(PSKBidList, sender)
+
+        -- Optionally print confirmation
+        print("|cff00ff00PSK:|r Bid received from " .. sender)
+
+        -- Update the UI if it's open
+        if pskFrame and pskFrame:IsShown() then
+            UpdateNameList()
+        end
+    end
+end)
