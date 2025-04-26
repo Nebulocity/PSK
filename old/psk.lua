@@ -2,10 +2,13 @@
 print("PSK addon loaded!")
 
 
--- Persistent database setup
+-- Persistent PSK database setup
 if not PSKDB then
     PSKDB = {}
 end
+
+-- Persistent minimap databse setup
+PSKMinimapDB = PSKMinimapDB or { hide = false, minimapPos = 195 }
 
 
 -- Cleanup: remove invalid entries that may have numeric class values
@@ -298,6 +301,7 @@ end
 table.insert(UISpecialFrames, "PSKMainFrame")
 
 
+
 -- Minimap Button
 local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
 if ldb then
@@ -319,7 +323,7 @@ if ldb then
     })
     local icon = LibStub("LibDBIcon-1.0", true)
     if icon then
-        icon:Register("PSK", dataObject, {})
+        icon:Register("PSK", dataObject, PSKMinimapDB)
     end
 end
 

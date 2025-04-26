@@ -1,0 +1,11 @@
+## Interface: 11507
+## Title: Perchance KSK (PSK)
+## Notes: Addon for Perchance to keep track of KSK listing.
+## Author: Taurbucks (Nightslayer-US)
+## Version: 1.0.0
+## RequiredDeps:
+## X-Curse-Project-ID: 99999
+## SavedVariables: PSKDB, PSKMinimapDB
+## SavedVariablesPerCharacter: 
+
+psk.lua
