@@ -65,24 +65,24 @@ function PSK:StartBidding()
     PSK.BidEntries = {}
 
     local listName = (PSK.CurrentList == "Tier") and "Tier List" or "Main List"
-    SendChatMessage("Bidding has started for the " .. listName .. "! 90 seconds remaining.", "RAID_WARNING")
+    Announce("[PSK] Bidding has started for the " .. listName .. "! 90 seconds remaining.")
 
+    C_Timer.After(10, function()
+        if PSK.BiddingOpen then
+            Announce("[PSK] 60 seconds left to bid!")
+        end
+    end)
+    C_Timer.After(20, function()
+        if PSK.BiddingOpen then
+            Announce("[PSK] 30 seconds left to bid!")
+        end
+    end)
     C_Timer.After(30, function()
         if PSK.BiddingOpen then
-            SendChatMessage("60 seconds left to bid!", "RAID_WARNING")
+            Announce("[PSK] 15 seconds left to bid!")
         end
     end)
-    C_Timer.After(60, function()
-        if PSK.BiddingOpen then
-            SendChatMessage("30 seconds left to bid!", "RAID_WARNING")
-        end
-    end)
-    C_Timer.After(75, function()
-        if PSK.BiddingOpen then
-            SendChatMessage("15 seconds left to bid!", "RAID_WARNING")
-        end
-    end)
-    C_Timer.After(90, function()
+    C_Timer.After(35, function() -- Close for real after 90
         if PSK.BiddingOpen then
             PSK:CloseBidding()
         end
@@ -94,7 +94,7 @@ end
 function PSK:CloseBidding()
     if not PSK.BiddingOpen then return end
     PSK.BiddingOpen = false
-    SendChatMessage("Bidding closed!", "RAID_WARNING")
+    Announce("[PSK] Bidding closed!")
     PSK:RefreshBidList()
 end
 

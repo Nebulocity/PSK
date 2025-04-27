@@ -60,7 +60,7 @@ end)
 -- Start/Close Bidding Button
 local biddingButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 biddingButton:SetPoint("LEFT", toggleButton, "RIGHT", 10, 0)
-biddingButton:SetSize(160, 30)
+biddingButton:SetSize(140, 30)
 biddingButton:SetText("Start Bidding")
 biddingButton:SetScript("OnClick", function()
     if PSK.BiddingOpen then
@@ -303,6 +303,44 @@ function PSK:RefreshBidList()
         statusText:SetText("Unknown")
         statusText:SetTextColor(1, 1, 1)
 
+		-- Award Button
+		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+		awardButton:SetSize(20, 20)
+		awardButton:SetPoint("LEFT", statusText, "RIGHT", 8, 0)
+		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
+		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
+		awardButton:SetScript("OnClick", function()
+			AwardPlayer(index)
+		end)
+		awardButton:SetText("") -- clear text
+
+		-- Pass Button
+		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+		passButton:SetSize(20, 20)
+		passButton:SetPoint("LEFT", awardButton, "RIGHT", 8, 0)
+		passButton:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+		passButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
+		passButton:SetScript("OnClick", function()
+			table.remove(PSKBidList, index)
+			PSK:RefreshBidList()
+		end)
+		passButton:SetText("") -- clear text
+
+		-- After creating Award button
+		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+		awardButton:SetSize(20, 20)
+		awardButton:SetPoint("LEFT", statusText, "RIGHT", 8, 0)
+		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
+		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
+		awardButton:SetScript("OnClick", function()
+			AwardPlayer(index)
+		end)
+		awardButton:SetText("") -- no weird text
+
+		-- 💥 Pulse visually
+		PSK:PulseButton(awardButton)
+		
+		-- Row offset
         yOffset = yOffset - 22
     end
 end
