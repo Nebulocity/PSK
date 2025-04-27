@@ -43,10 +43,33 @@ function AwardPlayer(index)
     end
 end
 
-
-
-
 -- Pass action (just clears selection)
 function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
+end
+
+-- SaveGuildMembers: save level 60s
+function SaveGuildMembers()
+    if not IsInGuild() then return end
+    wipe(PSKDB)
+
+    local total = GetNumGuildMembers()
+    for i = 1, total do
+        local name, _, _, level, classFileName, _, _, _, online = GetGuildRosterInfo(i)
+        if name and level == 60 then
+            name = Ambiguate(name, "short")
+            local token = classFileName and string.upper(classFileName) or "UNKNOWN"
+            PSKDB[name] = {
+                class  = token,
+                online = online,
+                seen   = date("%Y-%m-%d %H:%M"),
+            }
+        end
+    end
+end
+
+-- Refresh Roster
+function RefreshRoster()
+    if not IsInGuild() then return end
+    GuildRoster()
 end

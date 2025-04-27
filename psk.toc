@@ -3,15 +3,18 @@
 ## Notes: Toot tracking and guild roster manager for Perchance (Nightslayer-US)
 ## Version: 1.0
 ## Author: Taurbucks
-## SavedVariables: PSKDB, PSKMinimapDB
+## SavedVariables: PSKDB, PSKBidList, PSKMinimapDB
 
 media\icon.tga
 
 import.lua
+
 core.lua
+
 utils.lua
-sounds.lua
-guild.lua
+
 ui.lua
+
+sounds.lua
+
 minimap.lua
-psk.lua

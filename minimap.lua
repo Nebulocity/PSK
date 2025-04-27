@@ -6,10 +6,10 @@ if ldb then
         text = "PSK",
         icon = "Interface\\AddOns\\PSK\\media\\icon.tga",
         OnClick = function()
-            if pskFrame:IsShown() then
-                pskFrame:Hide()
+            if PSKMainFrame:IsShown() then
+                PSKMainFrame:Hide()
             else
-                pskFrame:Show()
+                PSKMainFrame:Show()
             end
         end,
         OnTooltipShow = function(tt)
