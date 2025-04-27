@@ -53,9 +53,7 @@ local biddingActive = false
 local bidList = {}
 local biddingTimers = {}
 
----------------------------------------------------
 -- Bidding Functions
----------------------------------------------------
 
 -- Utility: Send message to RAID chat
 local function SendRaidWarning(msg)
@@ -165,9 +163,8 @@ local function HandleIncomingBid(playerName, message)
     -- (Redraw bid list UI here to update names)
 end
 
----------------------------------------------------
+
 -- Event Listening
----------------------------------------------------
 
 -- Chat Event Listener for "bid"
 local f = CreateFrame("Frame")
@@ -179,8 +176,7 @@ f:SetScript("OnEvent", function(_, event, message, sender)
     HandleIncomingBid(playerName, message)
 end)
 
----------------------------------------------------
 -- Button Handlers
----------------------------------------------------
+
 startBidButton:SetScript("OnClick", StartBiddingWindow)
 cancelBidButton:SetScript("OnClick", CancelBiddingWindow)
