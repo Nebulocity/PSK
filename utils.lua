@@ -1,7 +1,11 @@
--- utils.lua
--- Helper functions for PSK
+-----------------------------------------------------------------
+-- Helper functions to simplify tasks and keep other files clean
+-----------------------------------------------------------------
 
--- Move player up in the current list
+------------------
+-- List functions
+------------------
+
 function MovePlayerUp(index)
     local list = PSKDB[PSKCurrentList]
     if not list or not list[index] then return end
@@ -11,7 +15,6 @@ function MovePlayerUp(index)
     end
 end
 
--- Move player down in the current list
 function MovePlayerDown(index)
     local list = PSKDB[PSKCurrentList]
     if not list or not list[index] then return end
@@ -20,6 +23,11 @@ function MovePlayerDown(index)
         list[index], list[index + 1] = list[index + 1], list[index]
     end
 end
+
+
+-------------------------
+-- Awarding/passing loot
+-------------------------
 
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
@@ -46,7 +54,7 @@ function AwardPlayer(index)
     table.insert(list, player)
 
     -- Step 6: Notify (send message)
-    PSK:Announce("Awarded loot to " .. player .. "!")  -- safer than SendChatMessage directly
+    Announce("Awarded loot to " .. player .. "!")  -- safer than SendChatMessage directly
 
     -- Step 7: Refresh the screens
     PSK:RefreshGuildList()
@@ -58,6 +66,22 @@ end
 function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
 end
+
+-- Removes a player from a list
+function RemoveFromList(list, name)
+    for i, v in ipairs(list) do
+        if v == name then
+            table.remove(list, i)
+            return true
+        end
+    end
+    return false
+end
+
+
+-----------------------
+-- Saves guild members
+-----------------------
 
 -- SaveGuildMembers: save level 60s
 function SaveGuildMembers()
@@ -79,27 +103,20 @@ function SaveGuildMembers()
     end
 end
 
--- Refresh Roster
+
+------------------------
+-- Refresh guild roster
+------------------------
+
 function RefreshRoster()
     if not IsInGuild() then return end
     GuildRoster()
 end
 
--- Removes a player from a list
-function RemoveFromList(list, name)
-    for i, v in ipairs(list) do
-        if v == name then
-            table.remove(list, i)
-            return true
-        end
-    end
-    return false
-end
 
-function AddToListEnd(list, name)
-    table.insert(list, name)
-end
-
+------------------------
+-- Chat message
+------------------------
 
 function Announce(message)
     if IsInRaid() then
