@@ -1,4 +1,8 @@
--- Setup minimap button using LibDataBroker and LibDBIcon
+----------------------------------------------------------------
+-- Create the minimap button and open/close the PSK main window
+-- Dependencies: LibDataBroker and LibDBIcon
+----------------------------------------------------------------
+
 local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
 if ldb then
     local dataObject = ldb:NewDataObject("PSK", {
