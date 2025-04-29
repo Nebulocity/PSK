@@ -4,24 +4,24 @@ local PSK = select(2, ...)
 
 
 -- Move player up in the current list
-function MovePlayerUp(index)
-    local list = PSKDB[PSK.CurrentList]
-    if not list or not list[index] then return end
+-- function MovePlayerUp(index)
+    -- local list = PSKDB[PSK.CurrentList]
+    -- if not list or not list[index] then return end
 
-    if index > 1 then
-        list[index], list[index - 1] = list[index - 1], list[index]
-    end
-end
+    -- if index > 1 then
+        -- list[index], list[index - 1] = list[index - 1], list[index]
+    -- end
+-- end
 
 -- Move player down in the current list
-function MovePlayerDown(index)
-    local list = PSKDB[PSK.CurrentList]
-    if not list or not list[index] then return end
+-- function MovePlayerDown(index)
+    -- local list = PSKDB[PSK.CurrentList]
+    -- if not list or not list[index] then return end
 
-    if index < #list then
-        list[index], list[index + 1] = list[index + 1], list[index]
-    end
-end
+    -- if index < #list then
+        -- list[index], list[index + 1] = list[index + 1], list[index]
+    -- end
+-- end
 
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)

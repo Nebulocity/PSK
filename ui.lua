@@ -146,6 +146,69 @@ bidScrollChild:SetSize(430, 355)
 bidScrollFrame:SetScrollChild(bidScrollChild)
 PSK.BidScrollChild = bidScrollChild
 
+-- Loot Drop List Header
+PSK.LootHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+PSK.LootHeader:SetPoint("TOP", frame, "TOP", 0, -80)
+PSK.LootHeader:SetText("Loot Drops (0)")
+
+-- Loot ScrollFrame
+local lootScrollFrame = CreateFrame("ScrollFrame", "PSKLootScrollFrame", frame, "UIPanelScrollFrameTemplate")
+lootScrollFrame:SetSize(250, 355)
+lootScrollFrame:SetPoint("TOP", frame, "TOP", 0, -110)
+
+local lootScrollChild = CreateFrame("Frame", nil, lootScrollFrame)
+lootScrollChild:SetSize(480, 355)
+lootScrollFrame:SetScrollChild(lootScrollChild)
+PSK.LootScrollChild = lootScrollChild
+
+
+----------------------------------------
+-- Refresh Loot List
+----------------------------------------
+
+function PSK:RefreshLootList()
+    if not PSK.LootDrops then return end
+
+    -- Clear previous loot
+    if PSK.LootScrollChild then
+        for i, child in ipairs({PSK.LootScrollChild:GetChildren()}) do
+            child:Hide()
+            child:SetParent(nil)
+        end
+    end
+
+    local yOffset = -5
+    for index, loot in ipairs(PSK.LootDrops) do
+        local row = CreateFrame("Button", nil, PSK.LootScrollChild)
+        row:SetSize(240, 20)
+        row:SetPoint("TOP", 0, yOffset)
+
+        -- Icon
+        local iconTexture = row:CreateTexture(nil, "ARTWORK")
+        iconTexture:SetSize(16, 16)
+        iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
+        iconTexture:SetTexture(loot.itemTexture)
+
+        -- Item Link Text
+        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
+        itemText:SetText(loot.itemLink)
+
+        -- Highlight on click
+        row:SetScript("OnClick", function()
+            PSK.SelectedItem = loot.itemLink
+            Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
+        end)
+
+        yOffset = yOffset - 22
+    end
+
+    -- Update header
+    PSK.LootHeader:SetText("Loot Drops (" .. #PSK.LootDrops .. ")")
+end
+
+
+
 ----------------------------------------
 -- Refresh Guild List (for Main or Tier)
 ----------------------------------------

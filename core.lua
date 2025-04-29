@@ -8,6 +8,43 @@ PSK.BidEntries = {}
 PSK.CurrentList = "Main"
 
 ----------------------------------------
+-- Storage for current loot drops
+----------------------------------------
+PSK.LootDrops = {} -- [1] {itemLink = "", itemTexture = "", itemName = "", itemID = number}
+
+local lootFrame = CreateFrame("Frame")
+lootFrame:RegisterEvent("LOOT_OPENED")
+
+lootFrame:SetScript("OnEvent", function(self, event)
+    if event == "LOOT_OPENED" then
+        PSK:CaptureLoot()
+    end
+end)
+
+function PSK:CaptureLoot()
+    wipe(PSK.LootDrops)
+
+    local numLootItems = GetNumLootItems()
+    for i = 1, numLootItems do
+        local itemLink = GetLootSlotLink(i)
+        local icon, name, quantity, quality, locked = GetLootSlotInfo(i)
+
+        if itemLink and name then
+            table.insert(PSK.LootDrops, {
+                itemLink = itemLink,
+                itemName = name,
+                itemTexture = icon,
+                itemID = tonumber(string.match(itemLink, "item:(%d+):")),
+            })
+        end
+    end
+
+    PSK:RefreshLootList()
+end
+
+
+
+----------------------------------------
 -- Event Frame for Updates
 ----------------------------------------
 
