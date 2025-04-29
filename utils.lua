@@ -25,38 +25,83 @@ end
 
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
-	print(index)
-    -- Step 1: Find the player name from the bids list
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
-	print(playerName)
-    if not playerName then return end
+    if not playerName then
+        print("AwardPlayer: No playerName found at index", index)
+        return
+    end
+
+    -- Step 1: Confirm with the user first
+    StaticPopupDialogs["PSK_CONFIRM_AWARD"] = {
+        text = "Are you sure you want to award loot to |cffffff00%s|r?",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+            -- Award confirmed
+            PerformAward(index)
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+
+    StaticPopup_Show("PSK_CONFIRM_AWARD", playerName)
+end
+
+function PerformAward(index)
+    local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
+    local playerName = playerEntry and playerEntry.name
+    if not playerName then
+        print("PerformAward: No playerName found at index", index)
+        return
+    end
+
+    print("PerformAward: Awarding loot to", playerName)
 
     -- Step 2: Remove from the Bids list
     table.remove(PSK.BidEntries, index)
+    print("PerformAward: Removed from bid list.")
 
-    -- Step 3: Find which loot list (Main or Tier) we're using
-    local list = PSKDB[PSK.CurrentList]
-    if not list then return end
+    -- Step 3: Find which loot list we're using
+    local list = GetCurrentList()
+    if not list then
+        print("PerformAward: No loot list found for current list", PSK.CurrentList)
+        return
+    end
 
     -- Step 4: Remove from current list if present
-    for i, name in ipairs(list) do
-        if name == playerName then
+    local found = false
+    for i = #list, 1, -1 do
+        if list[i]:lower() == playerName:lower() then
             table.remove(list, i)
+            found = true
+            print("PerformAward: Removed player from loot list at position", i)
             break
         end
     end
 
-    -- Step 5: Insert at the bottom of the loot list
-    table.insert(list, playerName)
+    if not found then
+        print("PerformAward: Player", playerName, "not found in loot list!")
+    end
 
-    -- Step 6: Notify (send message)
+    -- Step 5: Insert at bottom
+    table.insert(list, playerName)
+    print("PerformAward: Inserted player at bottom of loot list.")
+
+        -- Step 6: Notify
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
 
-    -- Step 7: Refresh the screens
+    -- Step 7: Refresh screens
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
+
+    -- Step 8: Play "ding" sound
+    PlaySound(12867) -- Ready Check Complete sound
+
 end
+
 
 
 -- Pass action (just clears selection)
@@ -96,4 +141,12 @@ function Announce(message)
 	else
 		print(message)
 	end
+end
+
+function GetCurrentList()
+    if PSK.CurrentList == "Main" then
+        return PSKDB.MainList
+    elseif PSK.CurrentList == "Tier" then
+        return PSKDB.TierList
+    end
 end
