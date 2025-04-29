@@ -1,13 +1,11 @@
------------------------------------------------------------------
--- Helper functions to simplify tasks and keep other files clean
------------------------------------------------------------------
+-- utils.lua
+-- Helper functions for PSK
+local PSK = select(2, ...)
 
-------------------
--- List functions
-------------------
 
+-- Move player up in the current list
 function MovePlayerUp(index)
-    local list = PSKDB[PSKCurrentList]
+    local list = PSKDB[PSK.CurrentList]
     if not list or not list[index] then return end
 
     if index > 1 then
@@ -15,8 +13,9 @@ function MovePlayerUp(index)
     end
 end
 
+-- Move player down in the current list
 function MovePlayerDown(index)
-    local list = PSKDB[PSKCurrentList]
+    local list = PSKDB[PSK.CurrentList]
     if not list or not list[index] then return end
 
     if index < #list then
@@ -24,37 +23,35 @@ function MovePlayerDown(index)
     end
 end
 
-
--------------------------
--- Awarding/passing loot
--------------------------
-
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
+	print(index)
     -- Step 1: Find the player name from the bids list
-    local player = PSKBidList and PSKBidList[index]
-    if not player then return end
+    local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
+    local playerName = playerEntry and playerEntry.name
+	print(playerName)
+    if not playerName then return end
 
     -- Step 2: Remove from the Bids list
-    table.remove(PSKBidList, index)
+    table.remove(PSK.BidEntries, index)
 
     -- Step 3: Find which loot list (Main or Tier) we're using
-    local list = PSKDB[PSKCurrentList]
+    local list = PSKDB[PSK.CurrentList]
     if not list then return end
 
     -- Step 4: Remove from current list if present
     for i, name in ipairs(list) do
-        if name == player then
+        if name == playerName then
             table.remove(list, i)
             break
         end
     end
 
     -- Step 5: Insert at the bottom of the loot list
-    table.insert(list, player)
+    table.insert(list, playerName)
 
     -- Step 6: Notify (send message)
-    Announce("Awarded loot to " .. player .. "!")  -- safer than SendChatMessage directly
+    Announce("[PSK] Awarded loot to " .. playerName .. "!")
 
     -- Step 7: Refresh the screens
     PSK:RefreshGuildList()
@@ -66,22 +63,6 @@ end
 function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
 end
-
--- Removes a player from a list
-function RemoveFromList(list, name)
-    for i, v in ipairs(list) do
-        if v == name then
-            table.remove(list, i)
-            return true
-        end
-    end
-    return false
-end
-
-
------------------------
--- Saves guild members
------------------------
 
 -- SaveGuildMembers: save level 60s
 function SaveGuildMembers()
@@ -103,25 +84,16 @@ function SaveGuildMembers()
     end
 end
 
-
-------------------------
--- Refresh guild roster
-------------------------
-
+-- Refresh Roster
 function RefreshRoster()
     if not IsInGuild() then return end
     GuildRoster()
 end
 
-
-------------------------
--- Chat message
-------------------------
-
 function Announce(message)
-    if IsInRaid() then
-        SendChatMessage(message, "RAID")
-    else
-        print(message)
-    end
+	if IsInRaid() then
+		SendChatMessage(message, "RAID")
+	else
+		print(message)
+	end
 end

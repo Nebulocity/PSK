@@ -1,11 +1,9 @@
-------------------------------------------------------------
--- Handles guild data gathering, bidding session management
-------------------------------------------------------------
+-- core.lua
 
 local PSK = select(2, ...)
 
 -- Main Variables
-PSKBiddingActive = false
+BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
 
@@ -19,36 +17,14 @@ eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 
 eventFrame:SetScript("OnEvent", function(self, event)
-    PSK:UpdateGuildData()
+    UpdateGuildData()
 end)
 
---------------------------
--- Chat Frame for Bidding
---------------------------
-
-local chatFrame = CreateFrame("Frame")
-chatFrame:RegisterEvent("CHAT_MSG_RAID")
-chatFrame:RegisterEvent("CHAT_MSG_RAID_WARNING")
-chatFrame:RegisterEvent("CHAT_MSG_PARTY")
-chatFrame:RegisterEvent("CHAT_MSG_SAY")
-
-chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
-    if not PSKBiddingActive then return end
-    if not sender then return end
-
-    msg = msg:lower()
-    if msg:find("bid") then
-        local simpleName = sender:match("^(.-)%-.+") or sender
-        PSK:AddBid(simpleName)
-    end
-end)
-
-
 ----------------------------------------
--- Update Guild Data
+-- Update Guild Data (live)
 ----------------------------------------
 
-function PSK:UpdateGuildData()
+function UpdateGuildData()
     if not IsInGuild() then return end
 
     GuildRoster()
@@ -80,78 +56,93 @@ function PSK:UpdateGuildData()
 end
 
 ----------------------------------------
--- Bidding System
+-- Bidding System (Unchanged)
 ----------------------------------------
 
-function PSK:StartBidding()
-	PSKBiddingActive = true
-	PSKBiddingOpen = true
-	PSKBidTimer = 90
-	
-	Announce("[PSK] Bidding started!  Type 'Bid' to place a bid.")
-	
-	if PSK.BidButon	then
-		PSK.BidButton:SetText("Stop Bidding")
-		
-		if PSK.BidButton.Border then 
-			PSK.BidButton.Border.SetAlpha(1)
-			PSK.BidButton.Border:Show()
-			PSK.BidButton.Border.Pulse:Stop()
-			PSK.BidButton.Border.Pulse:Play()
-		end
-	end	
-	
-	-- Clear bid entries every time bidding has started
+function StartBidding()
+    if BiddingOpen then return end
+    BiddingOpen = true
     PSK.BidEntries = {}
 	
+	if PSK.BidButton then
+        PSK.BidButton:SetText("Stop Bidding")
+		
+        if PSK.BidButton.Border then
+            PSK.BidButton.Border:SetAlpha(1)
+            PSK.BidButton.Border:Show()
+            PSK.BidButton.Border.Pulse:Stop()
+            PSK.BidButton.Border.Pulse:Play()
+        end
+    end
+	
     local listName = (PSK.CurrentList == "Tier") and "Tier List" or "Main List"
-    Announce("[PSK] Bidding has started for the " .. listName .. "! 90 seconds remaining.")
+    
+	Announce("[PSK] Bidding has started for the " .. listName .. "! 90 seconds remaining.")
 
-    C_Timer.After(10, function()
-        if PSKBiddingActive then
-            Announce("[PSK] 60 seconds left to bid!")
-        end
-    end)
-    C_Timer.After(20, function()
-        if PSKBiddingActive then
-            Announce("[PSK] 30 seconds left to bid!")
-        end
-    end)
-    C_Timer.After(30, function()
-        if PSKBiddingActive then
-            Announce("[PSK] 15 seconds left to bid!")
-        end
-    end)
-    C_Timer.After(35, function() -- Close for real after 90
-        if PSKBiddingActive then
-            PSK:CloseBidding()
-        end
-    end)
+	C_Timer.After(30, function()
+		if BiddingOpen then
+			Announce("[PSK] 60 seconds left to bid!")
+		end
+	end)
+
+	C_Timer.After(60, function()
+		if BiddingOpen then
+			Announce("[PSK] 30 seconds left to bid!")
+		end
+	end)
+
+	C_Timer.After(75, function()
+		if BiddingOpen then
+			Announce("[PSK] 15 seconds left to bid!")
+		end
+	end)
+
+	C_Timer.After(90, function()
+		if BiddingOpen then
+			CloseBidding()
+		end
+	end)
+
 
     PSK:RefreshBidList()
 end
 
+function CloseBidding()
+    BiddingOpen = false 
 
-function PSK:CloseBidding()
-	PSKBiddingActive = false
-	PSKBiddingOpen = false
-	
-	Announce("[PSK] Bidding closed!")
+    Announce("[PSK] Bidding closed!")
 	
 	if PSK.BidButton then
-		PSK.BidButton.SetText("Start Bidding")
-		
+        PSK.BidButton:SetText("Start Bidding")
+        
 		if PSK.BidButton.Border then
-			PSK.BidButton.Border.Pulse:Stop()
-			PSK.BidButton.Border:SetAlpha(1)
-			PSK.BidButton.Border:Hide()
-		end
-	end
-
+            PSK.BidButton.Border.Pulse:Stop()
+            PSK.BidButton.Border:SetAlpha(1) -- Reset after stopping animation
+            PSK.BidButton.Border:Hide()
+        end
+    end
+	
     PSK:RefreshBidList()
 end
 
-function PSK:AddBid(name)
+local chatFrame = CreateFrame("Frame")
+chatFrame:RegisterEvent("CHAT_MSG_RAID")
+chatFrame:RegisterEvent("CHAT_MSG_RAID_WARNING")
+chatFrame:RegisterEvent("CHAT_MSG_PARTY")
+chatFrame:RegisterEvent("CHAT_MSG_SAY")
+
+chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
+    if not BiddingOpen then return end
+    if not sender then return end
+
+    msg = msg:lower()
+    if msg:find("bid") then
+        local simpleName = sender:match("^(.-)%-.+") or sender
+        AddBid(simpleName)
+    end
+end)
+
+function AddBid(name)
     if not name then return end
 
     for _, entry in ipairs(PSK.BidEntries) do
@@ -184,3 +175,23 @@ function PSK:AddBid(name)
         end
     end
 end
+
+
+-- Register slash command AFTER player login
+local slashFrame = CreateFrame("Frame")
+slashFrame:RegisterEvent("PLAYER_LOGIN")
+
+slashFrame:SetScript("OnEvent", function()
+    SLASH_PSK1 = "/psk"
+    SlashCmdList["PSK"] = function()
+        if PSK and PSK.MainFrame then
+            if PSK.MainFrame:IsShown() then
+                PSK.MainFrame:Hide()
+            else
+                PSK.MainFrame:Show()
+            end
+        else
+            print("PSK: MainFrame is not available yet.")
+        end
+    end
+end)

@@ -1,6 +1,4 @@
---------------------------------------------------------
--- Creates and manages the user interface for the addon
---------------------------------------------------------
+-- ui.lua
 
 local PSK = select(2, ...)
 
@@ -17,14 +15,12 @@ frame:SetFrameStrata("HIGH")
 frame:SetFrameLevel(200)
 
 PSK.MainFrame = frame
+PSK.CurrentList = "Main" -- Default selection
 
 -- Title
 frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 frame.title:SetPoint("CENTER", frame.TitleBg, "CENTER", 0, 0)
 frame.title:SetText("Perchance PSK - Perchance Some Loot?")
-
--- Sets the default list to show (main or tier)
-PSK.CurrentList = "Main" 
 
 -- Toggle Main/Tier Button
 local toggleButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
@@ -39,6 +35,7 @@ toggleButton:SetScript("OnClick", function()
         PSK.CurrentList = "Main"
         toggleButton:SetText("Switch to Tier List")
     end
+
 	
     -- Update the title based on list
     if PSK.CurrentList == "Main" then
@@ -61,34 +58,60 @@ toggleButton:SetScript("OnClick", function()
 end)
 
 -- Start/Close Bidding Button
-local PSK.BidButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
-PSK.BidButton:SetPoint("LEFT", toggleButton, "RIGHT", 10, 0)
+PSK.BidButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 PSK.BidButton:SetSize(140, 30)
+PSK.BidButton:SetPoint("TOPLEFT", toggleButton, "TOPRIGHT", 10, 0)
 PSK.BidButton:SetText("Start Bidding")
-PSK.BidButton:SetScript("OnClick", function()
-    if PSKBiddingActive then
-        PSK:CloseBidding()
-    else
-        PSK:StartBidding()
-    end
-end)
+PSK.BidButton:SetNormalFontObject(GameFontNormal)
+PSK.BidButton:SetHighlightFontObject(GameFontNormal)
 
+-- Create a Glow Border Frame
 PSK.BidButton.Border = CreateFrame("Frame", nil, PSK.BidButton, "BackdropTemplate")
 PSK.BidButton.Border:SetAllPoints()
 PSK.BidButton.Border:SetFrameLevel(PSK.BidButton:GetFrameLevel() + 1)
-PSK.BidButton.Border:SetBackdropBorderColor(0, 1, 0, 1) -- Bright green
-PSK.BidButton.Border:Hide()
 
+PSK.BidButton.Border:SetBackdrop({
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", -- simple thin border
+    edgeSize = 15,
+})
+
+PSK.BidButton.Border:SetBackdropBorderColor(0, 1, 0, 1) -- Bright green
+PSK.BidButton.Border:Hide() -- Hidden initially
+
+-- Pulse Animation for the Border
 local pulse = PSK.BidButton.Border:CreateAnimationGroup()
 
 local fadeOut = pulse:CreateAnimation("Alpha")
+fadeOut:SetFromAlpha(1)
+fadeOut:SetToAlpha(0.5)
+fadeOut:SetDuration(0.7)
+fadeOut:SetOrder(1)
+
+local fadeIn = pulse:CreateAnimation("Alpha")
 fadeIn:SetFromAlpha(0.5)
 fadeIn:SetToAlpha(1)
 fadeIn:SetDuration(0.7)
 fadeIn:SetOrder(2)
-pulse.SetLooping("REPEAT")
 
+pulse:SetLooping("REPEAT")
+
+-- Save the animation
 PSK.BidButton.Border.Pulse = pulse
+
+PSK.BidButton:SetPoint("LEFT", toggleButton, "RIGHT", 10, 0)
+PSK.BidButton:SetSize(160, 30)
+PSK.BidButton:SetText("Start Bidding")
+PSK.BidButton:SetScript("OnClick", function()
+	if BiddingOpen then
+		PSK.BidButton.Border.Pulse:Stop()
+		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
+		CloseBidding()
+	else
+		PSK.BidButton.Border:Show()
+		PSK.BidButton.Border.Pulse:Play()
+		StartBidding()
+	end
+end)
 
 -- Left "List" Header
 PSK.ListHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
@@ -317,44 +340,45 @@ function PSK:RefreshBidList()
         nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
         nameText:SetText(bidData.name)
 
-		-- Award Button
+        -- Award Button
 		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		awardButton:SetSize(20, 20)
-		awardButton:SetPoint("LEFT", statusText, "RIGHT", 8, 0)
+		awardButton:SetPoint("LEFT", nameText, "RIGHT", 8, 0)
+		awardButton:SetPoint("CENTER", row, "CENTER", 150, 0)
 		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
 		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		awardButton:SetScript("OnClick", function()
-			AwardPlayer(index)
-		end)
-		awardButton:SetText("") -- clear text
+		awardButton.index = index 
+		awardButton:SetText("") -- Clear text
+		awardButton:SetScript("OnClick", function(self)
+			if self.index then
+				AwardPlayer(self.index)
+			end
+		end)		
 
 		-- Pass Button
 		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		passButton:SetSize(20, 20)
+		passButton:SetSize(16, 16) -- Smaller size
 		passButton:SetPoint("LEFT", awardButton, "RIGHT", 8, 0)
-		passButton:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-		passButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		passButton:SetScript("OnClick", function()
-			table.remove(PSKBidList, index)
-			PSK:RefreshBidList()
-		end)
-		passButton:SetText("") -- clear text
+		passButton:SetPoint("CENTER", row, "CENTER", 180, 0) -- center align
 
-		-- After creating Award button
-		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		awardButton:SetSize(20, 20)
-		awardButton:SetPoint("LEFT", statusText, "RIGHT", 8, 0)
-		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
-		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		awardButton:SetScript("OnClick", function()
-			AwardPlayer(index)
-		end)
-		awardButton:SetText("") -- no weird text
+		local passTexture = passButton:CreateTexture(nil, "ARTWORK")
+		passTexture:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+		passTexture:SetAllPoints(passButton)
+		passTexture:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+		passButton:SetNormalTexture(passTexture)
 
-		-- 💥 Pulse visually
-		PSK:PulseButton(awardButton)
+		passButton.index = index
+
+		passButton:SetScript("OnClick", function(self)
+			if self.index then
+				table.remove(PSK.BidEntries, self.index)
+				PSK:RefreshBidList()
+			end
+		end)
+
 		
-		-- Row offset
+		passButton:SetText("") -- Clear text
+
         yOffset = yOffset - 22
     end
 end
