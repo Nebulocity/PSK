@@ -2,6 +2,16 @@
 
 local PSK = select(2, ...)
 
+-- For bidding
+if not PSKDB.MainList then
+    PSKDB.MainList = {}
+end
+
+if not PSKDB.TierList then
+    PSKDB.TierList = {}
+end
+
+
 -- Main Variables
 BiddingOpen = false
 PSK.BidEntries = {}

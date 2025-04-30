@@ -25,38 +25,77 @@ local PSK = select(2, ...)
 
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
-	print(index)
-    -- Step 1: Find the player name from the bids list
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
-	print(playerName)
-    if not playerName then return end
+    if not playerName then
+        print("AwardPlayer: No playerName found at index", index)
+        return
+    end
 
-    -- Step 2: Remove from the Bids list
+    -- Step 1: Confirm with the user first
+    StaticPopupDialogs["PSK_CONFIRM_AWARD"] = {
+        text = "Are you sure you want to award loot to |cffffff00%s|r?",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+            -- Award confirmed
+            PerformAward(index)
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+
+    StaticPopup_Show("PSK_CONFIRM_AWARD", playerName)
+end
+
+function PerformAward(index)
+    local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
+    local playerName = playerEntry and playerEntry.name
+    if not playerName then
+        print("PerformAward: No playerName found at index", index)
+        return
+    end
+
+    local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
+
+	if type(list) ~= "table" then
+		print("PerformAward: No valid list found for current list:", tostring(PSK.CurrentList))
+		return
+	end
+
+    print("PerformAward: Awarding loot to", playerName)
+
     table.remove(PSK.BidEntries, index)
+    print("PerformAward: Removed from bid list.")
 
-    -- Step 3: Find which loot list (Main or Tier) we're using
-    local list = PSKDB[PSK.CurrentList]
-    if not list then return end
-
-    -- Step 4: Remove from current list if present
-    for i, name in ipairs(list) do
-        if name == playerName then
+    local found = false
+    for i = #list, 1, -1 do
+        if list[i]:lower() == playerName:lower() then
             table.remove(list, i)
+            found = true
+            print("PerformAward: Removed player from loot list at position", i)
             break
         end
     end
 
-    -- Step 5: Insert at the bottom of the loot list
+    if not found then
+        print("PerformAward: Player", playerName, "not found in loot list!")
+    end
+
     table.insert(list, playerName)
+    print("PerformAward: Inserted player at bottom of loot list.")
 
-    -- Step 6: Notify (send message)
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
-
-    -- Step 7: Refresh the screens
+	PlaySoundFile("Sound\\Spells\\HolyWard.wav", "Master")
+	
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
+    PlaySound(12867) -- Sound cue
 end
+
+
 
 
 -- Pass action (just clears selection)
@@ -96,4 +135,48 @@ function Announce(message)
 	else
 		print(message)
 	end
+end
+
+local DEFAULT_COLUMN_WIDTH = 220
+
+local COLUMN_HEIGHT = 355
+
+-- Helper to create bordered scroll frames with header
+-- utils.lua
+-- Helper to create bordered scroll frames with header
+
+local DEFAULT_COLUMN_WIDTH = 220
+local COLUMN_HEIGHT = 355
+
+function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
+    local COLUMN_WIDTH = customWidth or DEFAULT_COLUMN_WIDTH
+
+    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    container:SetSize(COLUMN_WIDTH, COLUMN_HEIGHT + 20)
+    container:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    container:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    container:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+
+    -- Header text
+    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 5, 10)
+    header:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    header:SetTextColor(1, 0.85, 0.1)
+    header:SetText(titleText)
+
+    -- ScrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", name, container, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetSize(COLUMN_WIDTH - 26, COLUMN_HEIGHT)
+    scrollFrame:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -5)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(COLUMN_WIDTH - 40, COLUMN_HEIGHT)
+    scrollFrame:SetScrollChild(scrollChild)
+
+    return scrollFrame, scrollChild, container, header
 end
