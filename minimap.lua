@@ -13,8 +13,8 @@ if ldb then
             end
         end,
         OnTooltipShow = function(tt)
-            tt:AddLine("PSK - Anniversary Addon")
-            tt:AddLine("Click to open or close the guild list.")
+            tt:AddLine("PSK - Perchance Some Loot?")
+            tt:AddLine("Click to open or close PSK.")
         end,
     })
     local icon = LibStub("LibDBIcon-1.0", true)

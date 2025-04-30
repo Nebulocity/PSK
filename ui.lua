@@ -53,6 +53,7 @@ PSK.ToggleListButton:SetScript("OnClick", function()
         header:SetText((listKey == "Main" and "Guild Members" or "Tier List") .. " (" .. count .. ")")
     end
 
+	PlayRandomPeonSound()
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
 end)
@@ -69,7 +70,7 @@ PSK.BidButton.biddingActive = false
 
 PSK.BidButton:SetScript("OnClick", function(self)
     self.biddingActive = not self.biddingActive
-
+	
     if self.biddingActive then
         self:SetText("Close Bidding")
         -- Add logic for starting bidding phase here
@@ -123,10 +124,16 @@ PSK.BidButton:SetScript("OnClick", function()
 		PSK.BidButton.Border.Pulse:Stop()
 		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
 		CloseBidding()
+
+		PlaySound(5275)
 	else
 		PSK.BidButton.Border:Show()
 		PSK.BidButton.Border.Pulse:Play()
 		StartBidding()
+		
+		PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
+
+
 	end
 end)
 
@@ -392,10 +399,11 @@ function PSK:RefreshBidList()
         nameText:SetPoint("LEFT", classIcon, "RIGHT", 4, 0)
         nameText:SetText(bidData.name)
 
-        --- Award Button (right-aligned)
+
+		-- Award Button (to the right of the name)
 		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		awardButton:SetSize(16, 16)
-		awardButton:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+		awardButton:SetPoint("LEFT", nameText, "RIGHT", 6, 0)
 		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
 		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
 		awardButton.index = index
@@ -420,17 +428,14 @@ function PSK:RefreshBidList()
 					pulse:SetLooping("NONE")
 					pulse:Play()
 				end
-
 				AwardPlayer(self.index)
 			end
 		end)
 
-
-
-		-- Pass Button (left of Award)
+		-- Pass Button (to the right of Award)
 		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		passButton:SetSize(16, 16)
-		passButton:SetPoint("RIGHT", awardButton, "LEFT", -4, 0)
+		passButton:SetPoint("LEFT", awardButton, "RIGHT", 4, 0)  -- Proper anchoring
 		passButton:SetFrameLevel(row:GetFrameLevel() + 1)
 
 		local passTexture = passButton:CreateTexture(nil, "ARTWORK")

@@ -2,27 +2,6 @@
 -- Helper functions for PSK
 local PSK = select(2, ...)
 
-
--- Move player up in the current list
--- function MovePlayerUp(index)
-    -- local list = PSKDB[PSK.CurrentList]
-    -- if not list or not list[index] then return end
-
-    -- if index > 1 then
-        -- list[index], list[index - 1] = list[index - 1], list[index]
-    -- end
--- end
-
--- Move player down in the current list
--- function MovePlayerDown(index)
-    -- local list = PSKDB[PSK.CurrentList]
-    -- if not list or not list[index] then return end
-
-    -- if index < #list then
-        -- list[index], list[index + 1] = list[index + 1], list[index]
-    -- end
--- end
-
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
@@ -53,46 +32,26 @@ end
 function PerformAward(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
-    if not playerName then
-        print("PerformAward: No playerName found at index", index)
-        return
-    end
-
     local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
 
-	if type(list) ~= "table" then
-		print("PerformAward: No valid list found for current list:", tostring(PSK.CurrentList))
-		return
-	end
-
-    print("PerformAward: Awarding loot to", playerName)
-
     table.remove(PSK.BidEntries, index)
-    print("PerformAward: Removed from bid list.")
 
     local found = false
     for i = #list, 1, -1 do
         if list[i]:lower() == playerName:lower() then
             table.remove(list, i)
             found = true
-            print("PerformAward: Removed player from loot list at position", i)
             break
         end
     end
 
-    if not found then
-        print("PerformAward: Player", playerName, "not found in loot list!")
-    end
-
     table.insert(list, playerName)
-    print("PerformAward: Inserted player at bottom of loot list.")
 
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
-	PlaySoundFile("Sound\\Spells\\HolyWard.wav", "Master")
-	
+		
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
-    PlaySound(12867) -- Sound cue
+    PlaySound(12867)
 end
 
 
