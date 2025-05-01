@@ -12,6 +12,7 @@ if not PSKDB.TierList then
 end
 
 
+
 -- Main Variables
 BiddingOpen = false
 PSK.BidEntries = {}
@@ -53,24 +54,30 @@ lootFrame:SetScript("OnEvent", function(self, event)
 end)
 
 function PSK:CaptureLoot()
-    wipe(PSK.LootDrops)
+	if not IsMasterLooter() then return end
 
-    local numLootItems = GetNumLootItems()
-    for i = 1, numLootItems do
-        local itemLink = GetLootSlotLink(i)
-        local icon, name, quantity, quality, locked = GetLootSlotInfo(i)
+	PSK.LootDrops = {}
 
-        if itemLink and name then
-            table.insert(PSK.LootDrops, {
-                itemLink = itemLink,
-                itemName = name,
-                itemTexture = icon,
-                itemID = tonumber(string.match(itemLink, "item:(%d+):")),
-            })
-        end
-    end
+	local numItems = GetNumLootItems()
+	for i = 1, numItems do
+		local itemLink = GetLootSlotLink(i)
+		local itemTexture = GetLootSlotInfo(i)
 
-    PSK:RefreshLootList()
+		if itemLink and itemTexture then
+			table.insert(PSK.LootDrops, {
+				itemLink = itemLink,
+				itemTexture = itemTexture
+			})
+		end
+	end
+
+	PSK:RefreshLootList()
+end
+
+
+local function IsMasterLooter()
+	local lootMethod = GetLootMethod()
+	return lootMethod == "master"
 end
 
 
@@ -127,9 +134,16 @@ end
 -- Bidding System (Unchanged)
 ----------------------------------------
 
-function StartBidding()
+function PSK:StartBidding()
     if BiddingOpen then return end
 		
+	if not PSK.SelectedItem then
+		print("You must select an item before starting bidding.")
+		PlaySound(SOUNDKIT.GS_TITLE_OPTION_EXIT)
+		return
+	end
+
+	
     BiddingOpen = true
     PSK.BidEntries = {}
 	
@@ -176,7 +190,7 @@ function StartBidding()
     PSK:RefreshBidList()
 end
 
-function CloseBidding()
+function PSK:CloseBidding()
     BiddingOpen = false 
 
     Announce("[PSK] Bidding closed!")

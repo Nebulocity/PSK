@@ -34,6 +34,43 @@ function PerformAward(index)
     local playerName = playerEntry and playerEntry.name
     local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
 
+	-- Fade out the selected loot row
+	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+		local row = PSK.SelectedLootRow
+		local fade = row:CreateAnimationGroup()
+		local fadeOut = fade:CreateAnimation("Alpha")
+		fadeOut:SetFromAlpha(1)
+		fadeOut:SetToAlpha(0)
+		fadeOut:SetDuration(0.5)
+		fadeOut:SetOrder(1)
+
+		fade:SetScript("OnFinished", function()
+			-- After fade completes, clear the selection
+			row.bg:SetColorTexture(0, 0, 0, 0)
+			PSK.SelectedLootRow = nil
+			PSK.SelectedItem = nil
+			if not BiddingOpen then
+				PSK.BidButton:Disable()
+			end
+
+			PSK.LootDrops = {}
+			PSK:RefreshLootList()
+		end)
+
+		fade:Play()
+	else
+		-- If no selected row, just fallback clear logic
+		PSK.SelectedLootRow = nil
+		PSK.SelectedItem = nil
+		
+		if not BiddingOpen then
+			PSK.BidButton:Disable()
+		end
+
+		PSK.LootDrops = {}
+		PSK:RefreshLootList()
+	end
+
     table.remove(PSK.BidEntries, index)
 
     local found = false
@@ -46,6 +83,14 @@ function PerformAward(index)
     end
 
     table.insert(list, playerName)
+
+	local item = PSK.SelectedItem
+	if item then
+		Announce("[PSK] " .. playerName .. " receives " .. item .. "!")
+	else
+		Announce("[PSK] " .. playerName .. " receives loot.")
+	end
+
 
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
 		
@@ -90,7 +135,8 @@ end
 
 function Announce(message)
 	if IsInRaid() then
-		SendChatMessage(message, "RAID")
+		--SendChatMessage(message, "RAID")
+		SendChatMessage(message, "PARTY")
 	else
 		print(message)
 	end

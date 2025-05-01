@@ -11,7 +11,7 @@ PSK.Headers = {}
 
 -- Create the main frame
 local frame = CreateFrame("Frame", "PSKMainFrame", UIParent, "BasicFrameTemplateWithInset")
-frame:SetSize(700, 500)
+frame:SetSize(705, 500)
 frame:SetPoint("CENTER")
 frame:SetMovable(true)
 frame:EnableMouse(true)
@@ -22,6 +22,8 @@ frame:SetFrameStrata("HIGH")
 frame:SetFrameLevel(200)
 
 PSK.MainFrame = frame
+table.insert(UISpecialFrames, "PSKMainFrame")
+
 PSK.CurrentList = "Main" -- Default selection
 
 -- Title
@@ -33,7 +35,7 @@ frame.title:SetText("Perchance PSK - Perchance Some Loot?")
 -- Switch Main/Tier List Button
 PSK.ToggleListButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 PSK.ToggleListButton:SetSize(140, 30)
-PSK.ToggleListButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 140, -40)
+PSK.ToggleListButton:SetPoint("TOP", frame, "TOP", -80, -28)
 PSK.ToggleListButton:SetText("Switch to Tier List")
 
 PSK.ToggleListButton:SetScript("OnClick", function()
@@ -119,17 +121,23 @@ PSK.BidButton.Border.Pulse = pulse
 PSK.BidButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", 10, 0)
 PSK.BidButton:SetSize(160, 30)
 PSK.BidButton:SetText("Start Bidding")
+
+if not BiddingOpen then
+    PSK.BidButton:Disable()
+end
+
+
 PSK.BidButton:SetScript("OnClick", function()
 	if BiddingOpen then
 		PSK.BidButton.Border.Pulse:Stop()
 		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
-		CloseBidding()
+		PSK:CloseBidding()
 
 		PlaySound(5275)
 	else
 		PSK.BidButton.Border:Show()
 		PSK.BidButton.Border.Pulse:Play()
-		StartBidding()
+		PSK:StartBidding()
 		
 		PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
 
@@ -154,7 +162,9 @@ PSK.ScrollChildren.Loot = lootChild
 PSK.Headers.Loot = lootHeader
 
 -- Bid List ScrollFrame
-local bidCount = #PSK.BidEntries or 0
+
+local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
+
 local bidScroll, bidChild, bidFrame, bidHeader =
     CreateBorderedScrollFrame("PSKBidScrollFrame", frame, 470, -110, "Bids (" .. bidCount .. ")", 220)
 
@@ -176,6 +186,10 @@ PSK.Headers.Bid = bidHeader
 function PSK:RefreshLootList()
     if not PSK.LootDrops then return end
 
+	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+		PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0) -- clear highlight
+	end
+
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
@@ -189,6 +203,9 @@ function PSK:RefreshLootList()
     local yOffset = -5
     for index, loot in ipairs(PSK.LootDrops) do
         local row = CreateFrame("Button", nil, scrollChild)
+		row.bg = row:CreateTexture(nil, "BACKGROUND")
+		row.bg:SetAllPoints()
+		row.bg:SetColorTexture(0, 0, 0, 0) -- fully transparent by default
         row:SetSize(240, 20)
         row:SetPoint("TOP", 0, yOffset)
 
@@ -205,9 +222,39 @@ function PSK:RefreshLootList()
 
         -- Highlight on click
         row:SetScript("OnClick", function()
-            PSK.SelectedItem = loot.itemLink
-            Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
-        end)
+			-- Deselect previous
+			if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+				PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
+			end
+
+			-- Select current
+			row.bg:SetColorTexture(0.2, 0.6, 1, 0.2) -- subtle blue
+			PSK.SelectedLootRow = row
+			PSK.SelectedItem = loot.itemLink
+			PSK.BidButton:Enable()
+
+			-- Announce
+			Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
+
+			-- Pulse animation
+			local pulse = row:CreateAnimationGroup()
+			local fadeOut = pulse:CreateAnimation("Alpha")
+			fadeOut:SetFromAlpha(1)
+			fadeOut:SetToAlpha(0.4)
+			fadeOut:SetDuration(0.2)
+			fadeOut:SetOrder(1)
+
+			local fadeIn = pulse:CreateAnimation("Alpha")
+			fadeIn:SetFromAlpha(0.4)
+			fadeIn:SetToAlpha(1)
+			fadeIn:SetDuration(0.2)
+			fadeIn:SetOrder(2)
+
+			pulse:SetLooping("NONE")
+			pulse:Play()
+		end)
+
+
 
         yOffset = yOffset - 22
     end
@@ -370,14 +417,14 @@ function PSK:RefreshBidList()
     local yOffset = -5
     for index, bidData in ipairs(PSK.BidEntries) do
         local row = CreateFrame("Button", nil, scrollChild)
+		row.bg = row:CreateTexture(nil, "BACKGROUND")
+		row.bg:SetAllPoints()
+		row.bg:SetColorTexture(0, 0, 0, 0) -- Transparent by default
+		row.bg:Hide()
+
         row:SetSize(220, 20)
         row:SetPoint("TOPLEFT", 0, yOffset)
         row:EnableMouse(true)
-
-        -- Background (optional visual testing)
-        -- row.bg = row:CreateTexture(nil, "BACKGROUND")
-        -- row.bg:SetAllPoints()
-        -- row.bg:SetColorTexture(0, 0.3, 0.1, 0.2)
 
         -- Position number
         local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -403,7 +450,7 @@ function PSK:RefreshBidList()
 		-- Award Button (to the right of the name)
 		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		awardButton:SetSize(16, 16)
-		awardButton:SetPoint("LEFT", nameText, "RIGHT", 6, 0)
+		awardButton:SetPoint("LEFT", nameText, "RIGHT", 30, 0)
 		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
 		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
 		awardButton.index = index
@@ -431,11 +478,34 @@ function PSK:RefreshBidList()
 				AwardPlayer(self.index)
 			end
 		end)
+		
+		awardButton:SetScript("OnEnter", function(self)
+			local row = self:GetParent()
+			if row and row.bg then
+				row.bg:SetColorTexture(0.2, 1, 0.2, 0.25)
+
+				row.bg:Show()
+			end
+
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText("Award Loot", 1, 1, 1)
+			GameTooltip:AddLine("Click to award loot to this player.", 0.8, 0.8, 0.8)
+			GameTooltip:Show()
+		end)
+
+		awardButton:SetScript("OnLeave", function(self)
+			local row = self:GetParent()
+			if row and row.bg then
+				row.bg:Hide()
+			end
+			GameTooltip:Hide()
+		end)
+
 
 		-- Pass Button (to the right of Award)
 		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		passButton:SetSize(16, 16)
-		passButton:SetPoint("LEFT", awardButton, "RIGHT", 4, 0)  -- Proper anchoring
+		passButton:SetPoint("LEFT", awardButton, "RIGHT", 15, 0)
 		passButton:SetFrameLevel(row:GetFrameLevel() + 1)
 
 		local passTexture = passButton:CreateTexture(nil, "ARTWORK")
@@ -452,6 +522,29 @@ function PSK:RefreshBidList()
 				PSK:RefreshBidList()
 			end
 		end)
+	
+		passButton:SetScript("OnEnter", function(self)
+			local row = self:GetParent()
+			if row and row.bg then
+				row.bg:SetColorTexture(1, 0.2, 0.2, 0.25)
+				row.bg:Show()
+			end
+
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText("Pass on Loot", 1, 1, 1)
+			GameTooltip:AddLine("Click to remove this player from bidding.", 0.8, 0.8, 0.8)
+			GameTooltip:Show()
+		end)
+
+		passButton:SetScript("OnLeave", function(self)
+			local row = self:GetParent()
+			if row and row.bg then
+				row.bg:Hide()
+			end
+			GameTooltip:Hide()
+		end)
+
+
 
 
         yOffset = yOffset - 22
