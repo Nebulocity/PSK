@@ -52,7 +52,7 @@ PSK.ToggleListButton:SetScript("OnClick", function()
     local header = PSK.Headers.Main
     local count = listKey == "Main" and #PSKDB.MainList or #PSKDB.TierList
     if header then
-        header:SetText((listKey == "Main" and "Guild Members" or "Tier List") .. " (" .. count .. ")")
+        header:SetText((listKey == "Main" and "PSK Main" or "PSK Tier") .. " (" .. count .. ")")
     end
 
 	PlayRandomPeonSound()
@@ -149,7 +149,7 @@ end)
 -- Main List ScrollFrame
 local mainListCount = #PSKDB.MainList or 0
 local guildScroll, guildChild, guildFrame, guildHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", frame, 10, -110, "Guild Members (" .. mainListCount .. ")")
+    CreateBorderedScrollFrame("PSKScrollFrame", frame, 10, -110, "PSK Main (" .. mainListCount .. ")")
 PSK.ScrollFrames.Main = guildScroll
 PSK.ScrollChildren.Main = guildChild
 PSK.Headers.Main = guildHeader
@@ -290,7 +290,7 @@ function PSK:RefreshGuildList()
     end
 
     -- Update header text
-    header:SetText((PSK.CurrentList == "Main" and "Guild Members" or "Tier List") .. " (" .. #names .. ")")
+    header:SetText((PSK.CurrentList == "Main" and "PSK Main" or "PSK Tier") .. " (" .. #names .. ")")
 
     local yOffset = -5
     for index, name in ipairs(names) do

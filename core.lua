@@ -11,6 +11,21 @@ if not PSKDB.TierList then
     PSKDB.TierList = {}
 end
 
+local CLASS_COLORS = RAID_CLASS_COLORS or {
+    WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
+    PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
+    HUNTER =  { r = 0.67, g = 0.83, b = 0.45 },
+    ROGUE =   { r = 1.00, g = 0.96, b = 0.41 },
+    PRIEST =  { r = 1.00, g = 1.00, b = 1.00 },
+    DEATHKNIGHT = { r = 0.77, g = 0.12, b = 0.23 },
+    SHAMAN =  { r = 0.00, g = 0.44, b = 0.87 },
+    MAGE =    { r = 0.25, g = 0.78, b = 0.92 },
+    WARLOCK = { r = 0.53, g = 0.53, b = 0.93 },
+    MONK =    { r = 0.00, g = 1.00, b = 0.59 },
+    DRUID =   { r = 1.00, g = 0.49, b = 0.04 },
+    DEMONHUNTER = { r = 0.64, g = 0.19, b = 0.79 },
+    EVOKER =  { r = 0.20, g = 0.85, b = 0.67 },
+}
 
 
 -- Main Variables
@@ -131,7 +146,7 @@ function UpdateGuildData()
 end
 
 ----------------------------------------
--- Bidding System (Unchanged)
+-- Bidding System 
 ----------------------------------------
 
 function PSK:StartBidding()
@@ -269,15 +284,295 @@ slashFrame:RegisterEvent("PLAYER_LOGIN")
 
 slashFrame:SetScript("OnEvent", function()
     SLASH_PSK1 = "/psk"
-    SlashCmdList["PSK"] = function()
-        if PSK and PSK.MainFrame then
-            if PSK.MainFrame:IsShown() then
-                PSK.MainFrame:Hide()
-            else
-                PSK.MainFrame:Show()
+    SlashCmdList["PSK"] = function(msg)
+		msg = msg and msg:lower():gsub("^%s+", "") or ""
+
+		if msg == "help" then
+			PSK:PrintHelp()
+			return
+		elseif msg == "list" then
+			PSK:PrintCurrentList()
+			return
+		end
+
+
+		if PSK and PSK.MainFrame then
+			if PSK.MainFrame:IsShown() then
+				PSK.MainFrame:Hide()
+			else
+				PSK.MainFrame:Show()
+			end
+		else
+			print("PSK: MainFrame is not available yet.")
+		end
+	end
+
+end)
+
+SLASH_PSKEXPORT1 = "/pskexport"
+SlashCmdList["PSKEXPORT"] = function(msg)
+    msg = msg and msg:lower():gsub("^%s+", "") or ""
+
+    if msg == "all" then
+        PSK:ExportList("Main")
+        PSK:ExportList("Tier")
+    else
+        PSK:ExportList(PSK.CurrentList or "Main")
+    end
+end
+
+
+function PSK:ExportList(listType)
+    local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
+
+    if #list == 0 then
+        print("[PSK] " .. listType .. " list is empty.")
+        return
+    end
+
+    local exportLine = table.concat(list, ", ")
+    PSK:ShowExportWindow(exportLine)
+end
+
+
+
+
+
+function PSK:PrintHelp()
+    print(" ")
+    print("|cff00ff00[PSK Addon Help]|r")
+    print("/psk                     - Toggle the PSK window")
+    print("/psk help                - Show this help menu")
+    print("/psk list                - Show players in the current list")
+    print("/pskadd <top|bottom> <main|tier> <name>    - Add player to a list")
+    print("/pskremove <name>        - Remove player from current list")
+    print("/pskremove all <name>    - Remove player from both lists")
+    -- print("/pskexport               - Export current list as plain text")
+	-- print("/pskexport [all]         - Export current or both lists")
+    print(" ")
+end
+
+
+
+function PSK:PrintCurrentList()
+    local listType = PSK.CurrentList or "Main"
+    local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
+
+    print(" ")
+    print("|cff00ff00[PSK: " .. listType .. " List]|r")
+
+    if #list == 0 then
+        print("(Empty)")
+        return
+    end
+
+    for i, name in ipairs(list) do
+        local playerData = PSKDB.Players[name]
+        local class = playerData and playerData.class or "UNKNOWN"
+        class = string.upper(class)
+
+        local color = CLASS_COLORS[class] or { r = 0.8, g = 0.8, b = 0.8 }
+        local hex = string.format("|cff%02x%02x%02x", color.r * 255, color.g * 255, color.b * 255)
+
+        local status = ""
+        if playerData and playerData.online == false then
+            status = " |cff888888(offline)|r"
+        end
+
+        print(i .. ". " .. hex .. name .. "|r" .. status)
+    end
+end
+
+
+
+-- Slash command: /pskadd <top|bottom> <main|tier> <name>
+SLASH_PSKADD1 = "/pskadd"
+SlashCmdList["PSKADD"] = function(msg)
+    -- Hooray for REGEX!  lol
+	local position, listType, name = msg:match("^(%S+)%s+(%S+)%s+(.+)$")
+
+	if not position or not listType or not name then
+        print("Usage: /pskadd <top | bottom> <main | tier> <playerName>")
+        return
+    end
+
+    position = position:lower()
+    listType = listType:lower()
+
+    if position ~= "top" and position ~= "bottom" then
+        print("Invalid position. Use 'top' or 'bottom'.")
+        return
+    end
+
+    if listType ~= "main" and listType ~= "tier" then
+        print("Invalid list type. Use 'main' or 'tier'.")
+        return
+    end
+
+    PSK:AddPlayerFromCommand(name, listType, position)
+end
+
+-- Removes a player's name from the currently viewed list.
+SLASH_PSKREMOVE1 = "/pskremove"
+SlashCmdList["PSKREMOVE"] = function(msg)
+    local scope, name
+
+    if msg:find("all%s+") then
+        scope, name = msg:match("^(all)%s+(%S+)")
+    else
+        name = msg:match("^(%S+)")
+        scope = "current"
+    end
+
+    if not name then
+        print("Usage: /pskremove <playerName> or /pskremove all <playerName>")
+        return
+    end
+
+    PSK:RemovePlayerByScope(scope, name)
+end
+
+function PSK:RemovePlayerByScope(scope, rawName)
+    local nameLower = Ambiguate(rawName, "short"):gsub("%s+", ""):lower()
+    local nameProper = rawName:sub(1, 1):upper() .. rawName:sub(2):lower()
+    local removed = false
+
+    local function tryRemove(list, listName)
+        for i = #list, 1, -1 do
+            if Ambiguate(list[i], "short"):lower() == nameLower then
+                table.remove(list, i)
+                print("[PSK] Removed " .. nameProper .. " from the " .. listName .. " list.")
+                return true
             end
-        else
-            print("PSK: MainFrame is not available yet.")
+        end
+        return false
+    end
+
+    if scope == "all" then
+        removed = tryRemove(PSKDB.MainList, "Main") or removed
+        removed = tryRemove(PSKDB.TierList, "Tier") or removed
+    else
+        local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+        local currentName = (PSK.CurrentList == "Tier") and "Tier" or "Main"
+        removed = tryRemove(currentList, currentName)
+    end
+
+    if not removed then
+        print("[PSK] Could not find " .. nameProper .. " in the specified list(s).")
+    end
+
+    PSK:RefreshGuildList()
+end
+
+
+
+local function CapitalizeName(name)
+    return name:sub(1, 1):upper() .. name:sub(2):lower()
+end
+
+function PSK:AddPlayerFromCommand(name, listType, position)
+    -- Normalize and clean input
+    local rawName = Ambiguate(name, "short"):gsub("%s+", "")
+    local nameLower = rawName:lower()
+    local nameProper = CapitalizeName(rawName)
+
+    -- Check if name is in guild
+    local foundInGuild = false
+    for i = 1, GetNumGuildMembers() do
+        local gName = GetGuildRosterInfo(i)
+        if gName and Ambiguate(gName, "short"):lower() == nameLower then
+            foundInGuild = true
+            break
         end
     end
-end)
+
+    -- Check if name is in raid or party
+    local foundInRaidOrParty = false
+    local unit = nil
+
+    if IsInRaid() then
+        for i = 1, MAX_RAID_MEMBERS do
+            local u = "raid" .. i
+            if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
+                foundInRaidOrParty = true
+                unit = u
+                break
+            end
+        end
+    elseif IsInGroup() then
+        for i = 1, GetNumGroupMembers() - 1 do
+            local u = "party" .. i
+            if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
+                foundInRaidOrParty = true
+                unit = u
+                break
+            end
+        end
+    end
+
+    if not foundInGuild and not foundInRaidOrParty then
+        print("[PSK] Error: '" .. nameProper .. "' is not in your guild, raid, or party. Cannot add.")
+        return
+    end
+
+    -- Choose target list
+    local list = (listType == "tier") and PSKDB.TierList or PSKDB.MainList
+
+    -- Check for duplicates
+    for _, existing in ipairs(list) do
+        if Ambiguate(existing, "short"):lower() == nameLower then
+            print("[PSK] " .. nameProper .. " is already in the " .. listType .. " list.")
+            return
+        end
+    end
+
+    -- Add to top or bottom
+    if position == "top" then
+        table.insert(list, 1, nameProper)
+    else
+        table.insert(list, nameProper)
+    end
+
+    -- Fill in player data if not already in the DB
+    if not PSKDB.Players[nameProper] then
+        local class = "UNKNOWN"
+        local level = "???"
+        local zone = "Unknown"
+        local online = false
+        local inRaid = false
+
+        -- Try guild roster first
+        for i = 1, GetNumGuildMembers() do
+            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
+            if gName and Ambiguate(gName, "short"):lower() == nameLower then
+                class = gClassFile or class
+                level = gLevel or level
+                zone = gZone or zone
+                online = gOnline or false
+                break
+            end
+        end
+
+        -- If not found, use party/raid unit data
+        if class == "UNKNOWN" and unit then
+            local _, classFile = UnitClass(unit)
+            class = classFile or class
+            level = UnitLevel(unit) or level
+            zone = GetZoneText()
+            online = UnitIsConnected(unit)
+            inRaid = UnitInRaid(unit) ~= nil
+        end
+
+        PSKDB.Players[nameProper] = {
+            class = class,
+            online = online,
+            inRaid = inRaid,
+            level = level,
+            zone = zone,
+        }
+    end
+
+    print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
+    PSK:RefreshGuildList()
+end
+
