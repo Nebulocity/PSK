@@ -4,6 +4,18 @@ Perchance PSK Addon.
 
 This addon will track a Main and Tier list for KSK loot distribution standings.
 
+Features:
+- Main addon used by the raid Loot Master (required, for now).
+  - Convenient minimap button of my dog, Mimic, opens/closes the addon.
+- KSK Main and Tier list are viewable in the left scroll list.
+  - Switching between lists is done by clicking the "Switch Main/Tier" button.
+- Dropped loot is presented in the center scroll list.
+- Current bids for loot are presented in the right scroll list.
+- To start bidding, click a piece of loot, and click "Start Bidding"!
+  - Players can type "bid" into /say, /party, /raid, or /whisper (to the loot master) to log a bid.
+  - Players with bids in the right scroll list will show two buttons: Award, and Pass.
+  - Clicking "Award" will open a confirmation dialog, and upon confirming, notify the raid/party that that loot was won by the selected player.
+
 Commands:
 - /psk
   - Opens the addon window.
@@ -21,5 +33,13 @@ Commands:
 
 
 Planned Features:
-- /pskexport <main|tier|all>
+- Awarding loot will actually give the loot to the awarded player.
+- Loot thresholds: uncommon, rare, epic, legendary.
+- UI option for adding/removing players.
+- UI option for exporting lists.
+- UI options for settings.
+- /pskexport <main|tier|all> command.
   - Will export the selected (or both) lists in CVS format.
+- Client addon to view the current Main and Tier lists.
+- Communication between client and loot master/guild officer to update the lists.
+  - Done by a "Request Update" button, a timestamp for last update, and which player it was updated from.
