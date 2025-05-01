@@ -2,27 +2,6 @@
 -- Helper functions for PSK
 local PSK = select(2, ...)
 
-
--- Move player up in the current list
-function MovePlayerUp(index)
-    local list = PSKDB[PSK.CurrentList]
-    if not list or not list[index] then return end
-
-    if index > 1 then
-        list[index], list[index - 1] = list[index - 1], list[index]
-    end
-end
-
--- Move player down in the current list
-function MovePlayerDown(index)
-    local list = PSKDB[PSK.CurrentList]
-    if not list or not list[index] then return end
-
-    if index < #list then
-        list[index], list[index + 1] = list[index + 1], list[index]
-    end
-end
-
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
@@ -53,54 +32,73 @@ end
 function PerformAward(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
-    if not playerName then
-        print("PerformAward: No playerName found at index", index)
-        return
-    end
+    local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
 
-    print("PerformAward: Awarding loot to", playerName)
+	-- Fade out the selected loot row
+	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+		local row = PSK.SelectedLootRow
+		local fade = row:CreateAnimationGroup()
+		local fadeOut = fade:CreateAnimation("Alpha")
+		fadeOut:SetFromAlpha(1)
+		fadeOut:SetToAlpha(0)
+		fadeOut:SetDuration(0.5)
+		fadeOut:SetOrder(1)
 
-    -- Step 2: Remove from the Bids list
+		fade:SetScript("OnFinished", function()
+			-- After fade completes, clear the selection
+			row.bg:SetColorTexture(0, 0, 0, 0)
+			PSK.SelectedLootRow = nil
+			PSK.SelectedItem = nil
+			if not BiddingOpen then
+				PSK.BidButton:Disable()
+			end
+
+			PSK.LootDrops = {}
+			PSK:RefreshLootList()
+		end)
+
+		fade:Play()
+	else
+		-- If no selected row, just fallback clear logic
+		PSK.SelectedLootRow = nil
+		PSK.SelectedItem = nil
+		
+		if not BiddingOpen then
+			PSK.BidButton:Disable()
+		end
+
+		PSK.LootDrops = {}
+		PSK:RefreshLootList()
+	end
+
     table.remove(PSK.BidEntries, index)
-    print("PerformAward: Removed from bid list.")
 
-    -- Step 3: Find which loot list we're using
-    local list = GetCurrentList()
-    if not list then
-        print("PerformAward: No loot list found for current list", PSK.CurrentList)
-        return
-    end
-
-    -- Step 4: Remove from current list if present
     local found = false
     for i = #list, 1, -1 do
         if list[i]:lower() == playerName:lower() then
             table.remove(list, i)
             found = true
-            print("PerformAward: Removed player from loot list at position", i)
             break
         end
     end
 
-    if not found then
-        print("PerformAward: Player", playerName, "not found in loot list!")
-    end
-
-    -- Step 5: Insert at bottom
     table.insert(list, playerName)
-    print("PerformAward: Inserted player at bottom of loot list.")
 
-        -- Step 6: Notify
+	local item = PSK.SelectedItem
+	if item then
+		Announce("[PSK] " .. playerName .. " receives " .. item .. "!")
+	else
+		Announce("[PSK] " .. playerName .. " receives loot.")
+	end
+
+
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
-
-    -- Step 7: Refresh screens
+		
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
-
-    -- Step 8: Play "ding" sound
-    PlaySound(12867) -- Ready Check Complete sound
-
+    PlaySound(12867)
 end
+
 
 
 
@@ -137,16 +135,53 @@ end
 
 function Announce(message)
 	if IsInRaid() then
-		SendChatMessage(message, "RAID")
+		--SendChatMessage(message, "RAID")
+		SendChatMessage(message, "PARTY")
 	else
 		print(message)
 	end
 end
 
-function GetCurrentList()
-    if PSK.CurrentList == "Main" then
-        return PSKDB.MainList
-    elseif PSK.CurrentList == "Tier" then
-        return PSKDB.TierList
-    end
+local DEFAULT_COLUMN_WIDTH = 220
+
+local COLUMN_HEIGHT = 355
+
+-- Helper to create bordered scroll frames with header
+-- utils.lua
+-- Helper to create bordered scroll frames with header
+
+local DEFAULT_COLUMN_WIDTH = 220
+local COLUMN_HEIGHT = 355
+
+function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
+    local COLUMN_WIDTH = customWidth or DEFAULT_COLUMN_WIDTH
+
+    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    container:SetSize(COLUMN_WIDTH, COLUMN_HEIGHT + 20)
+    container:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    container:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    container:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+
+    -- Header text
+    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 5, 10)
+    header:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    header:SetTextColor(1, 0.85, 0.1)
+    header:SetText(titleText)
+
+    -- ScrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", name, container, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetSize(COLUMN_WIDTH - 26, COLUMN_HEIGHT)
+    scrollFrame:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -5)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(COLUMN_WIDTH - 40, COLUMN_HEIGHT)
+    scrollFrame:SetScrollChild(scrollChild)
+
+    return scrollFrame, scrollChild, container, header
 end

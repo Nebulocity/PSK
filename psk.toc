@@ -4,6 +4,9 @@
 ## Version: 1.0
 ## Author: Taurbucks
 ## SavedVariables: PSKDB, PSKBidList, PSKMinimapDB
+## Dependencies
+## OptionalDeps: Blizzard_UIParent, Blizzard_CompactRaidFrames, Blizzard_RaidUI
+
 
 media\icon.tga
 

@@ -4,7 +4,6 @@ if not PSKDB then PSKDB = {} end
 
 if not PSKDB.MainList or #PSKDB.MainList == 0 then
 	PSKDB.MainList = {
-		"Taurbucks",
 		"Hevydevy",
 		"Leontino",
 		"Reikas",
@@ -70,7 +69,6 @@ end
 
 if not PSKDB.TierList or #PSKDB.TierList == 0 then
 	PSKDB.TierList = {
-		"Taurbucks",
 		"Hevydevy",
 		"Leontino",
 		"Lonerstoner",
