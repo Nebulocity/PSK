@@ -213,6 +213,9 @@ chatFrame:RegisterEvent("CHAT_MSG_RAID")
 chatFrame:RegisterEvent("CHAT_MSG_RAID_WARNING")
 chatFrame:RegisterEvent("CHAT_MSG_PARTY")
 chatFrame:RegisterEvent("CHAT_MSG_SAY")
+chatFrame:RegisterEvent("CHAT_MSG_WHISPER")
+chatFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
+chatFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
 
 chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
     if not BiddingOpen then return end
