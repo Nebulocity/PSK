@@ -90,7 +90,7 @@ settingsTitle:SetPoint("TOP", 0, -40)
 settingsTitle:SetText("PSK Settings")
 
 local soundCheckbox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
-soundCheckbox:SetPoint("TOPLEFT", 20, -80)
+soundCheckbox:SetPoint("TOPLEFT", 20, -80) 
 soundCheckbox.Text:SetText("Button Sounds")
 soundCheckbox:SetChecked(PSK.Settings.buttonSoundsEnabled)
 
