@@ -18,6 +18,8 @@ utils.lua
 
 ui.lua
 
+buttons.lua
+
 sounds.lua
 
 minimap.lua

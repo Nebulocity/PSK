@@ -1,558 +1,131 @@
--- ui.lua
-
 local PSK = select(2, ...)
+
+-- Ensure settings exist
+if not PSKDB then PSKDB = {} end
+PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true }
+PSK.Settings = CopyTable(PSKDB.Settings)
 
 -- Initialize containers
 PSK.ScrollFrames = {}
 PSK.ScrollChildren = {}
 PSK.Headers = {}
 
-
-
--- Create the main frame
-local frame = CreateFrame("Frame", "PSKMainFrame", UIParent, "BasicFrameTemplateWithInset")
-frame:SetSize(705, 500)
-frame:SetPoint("CENTER")
-frame:SetMovable(true)
-frame:EnableMouse(true)
-frame:RegisterForDrag("LeftButton")
-frame:SetScript("OnDragStart", frame.StartMoving)
-frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-frame:SetFrameStrata("HIGH")
-frame:SetFrameLevel(200)
-
-PSK.MainFrame = frame
+-- Create main frame
+PSK.MainFrame = CreateFrame("Frame", "PSKMainFrame", UIParent, "BasicFrameTemplateWithInset")
+PSK.MainFrame:SetSize(705, 500)
+PSK.MainFrame:SetPoint("CENTER")
+PSK.MainFrame:SetMovable(true)
+PSK.MainFrame:EnableMouse(true)
+PSK.MainFrame:RegisterForDrag("LeftButton")
+PSK.MainFrame:SetScript("OnDragStart", PSK.MainFrame.StartMoving)
+PSK.MainFrame:SetScript("OnDragStop", PSK.MainFrame.StopMovingOrSizing)
+PSK.MainFrame:SetFrameStrata("HIGH")
+PSK.MainFrame:SetFrameLevel(200)
 table.insert(UISpecialFrames, "PSKMainFrame")
 
-PSK.CurrentList = "Main" -- Default selection
-
 -- Title
-frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-frame.title:SetPoint("CENTER", frame.TitleBg, "CENTER", 0, 0)
-frame.title:SetText("Perchance PSK - Perchance Some Loot?")
+PSK.MainFrame.title = PSK.MainFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+PSK.MainFrame.title:SetPoint("CENTER", PSK.MainFrame.TitleBg, "CENTER", 0, 0)
+PSK.MainFrame.title:SetText("Perchance PSK - Perchance Some Loot?")
 
+-- Tabbed content frames
+PSK.ContentFrame = CreateFrame("Frame", nil, PSK.MainFrame)
+PSK.ContentFrame:SetAllPoints()
 
--- Switch Main/Tier List Button
-PSK.ToggleListButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
-PSK.ToggleListButton:SetSize(140, 30)
-PSK.ToggleListButton:SetPoint("TOP", frame, "TOP", -80, -28)
-PSK.ToggleListButton:SetText("Switch to Tier List")
-
-PSK.ToggleListButton:SetScript("OnClick", function()
-    if PSK.CurrentList == "Main" then
-        PSK.CurrentList = "Tier"
-        PSK.ToggleListButton:SetText("Switch to Main List")
-    else
-        PSK.CurrentList = "Main"
-        PSK.ToggleListButton:SetText("Switch to Tier List")
-    end
-
-    -- Update Header Text
-    local listKey = PSK.CurrentList
-    local header = PSK.Headers.Main
-    local count = listKey == "Main" and #PSKDB.MainList or #PSKDB.TierList
-    if header then
-        header:SetText((listKey == "Main" and "PSK Main" or "PSK Tier") .. " (" .. count .. ")")
-    end
-
-	PlayRandomPeonSound()
-    PSK:RefreshGuildList()
-    PSK:RefreshBidList()
-end)
-
--- Toggle Bidding Button (Start <-> Close)
-PSK.BidButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
-PSK.BidButton:SetSize(140, 30)
-
--- Recenter both buttons with respect to the main frame center
-PSK.ToggleListButton:SetPoint("TOP", frame, "TOP", -80, -40) -- slightly left of center
-
-PSK.BidButton:SetText("Start Bidding")
-PSK.BidButton.biddingActive = false
-
-PSK.BidButton:SetScript("OnClick", function(self)
-    self.biddingActive = not self.biddingActive
-	
-    if self.biddingActive then
-        self:SetText("Close Bidding")
-        -- Add logic for starting bidding phase here
-        Announce("[PSK] Bidding has begun! Whisper 'bid' to join.")
-    else
-        self:SetText("Start Bidding")
-        -- Add logic for closing bidding here
-        Announce("[PSK] Bidding has ended.")
-    end
-end)
-
-
--- Create a Glow Border Frame
-PSK.BidButton.Border = CreateFrame("Frame", nil, PSK.BidButton, "BackdropTemplate")
-PSK.BidButton.Border:SetAllPoints()
-PSK.BidButton.Border:SetFrameLevel(PSK.BidButton:GetFrameLevel() + 1)
-
-PSK.BidButton.Border:SetBackdrop({
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", -- simple thin border
-    edgeSize = 15,
+PSK.SettingsFrame = CreateFrame("Frame", nil, PSK.MainFrame, "BackdropTemplate")
+PSK.SettingsFrame:SetAllPoints()
+PSK.SettingsFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
 })
+PSK.SettingsFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+PSK.SettingsFrame:Hide()
 
-PSK.BidButton.Border:SetBackdropBorderColor(0, 1, 0, 1) -- Bright green
-PSK.BidButton.Border:Hide() -- Hidden initially
+PSK.CurrentList = "Main"
 
--- Pulse Animation for the Border
-local pulse = PSK.BidButton.Border:CreateAnimationGroup()
-
-local fadeOut = pulse:CreateAnimation("Alpha")
-fadeOut:SetFromAlpha(1)
-fadeOut:SetToAlpha(0.5)
-fadeOut:SetDuration(0.7)
-fadeOut:SetOrder(1)
-
-local fadeIn = pulse:CreateAnimation("Alpha")
-fadeIn:SetFromAlpha(0.5)
-fadeIn:SetToAlpha(1)
-fadeIn:SetDuration(0.7)
-fadeIn:SetOrder(2)
-
-pulse:SetLooping("REPEAT")
-
--- Save the animation
-PSK.BidButton.Border.Pulse = pulse
-
-PSK.BidButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", 10, 0)
-PSK.BidButton:SetSize(160, 30)
-PSK.BidButton:SetText("Start Bidding")
-
-if not BiddingOpen then
-    PSK.BidButton:Disable()
-end
-
-
-PSK.BidButton:SetScript("OnClick", function()
-	if BiddingOpen then
-		PSK.BidButton.Border.Pulse:Stop()
-		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
-		PSK:CloseBidding()
-
-		PlaySound(5275)
-	else
-		PSK.BidButton.Border:Show()
-		PSK.BidButton.Border.Pulse:Play()
-		PSK:StartBidding()
-		
-		PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
-
-
-	end
-end)
-
-
--- Main List ScrollFrame
+-- Scroll frames parented to ContentFrame
 local mainListCount = #PSKDB.MainList or 0
 local guildScroll, guildChild, guildFrame, guildHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", frame, 10, -110, "PSK Main (" .. mainListCount .. ")")
+    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, -110, "PSK Main (" .. mainListCount .. ")")
 PSK.ScrollFrames.Main = guildScroll
 PSK.ScrollChildren.Main = guildChild
 PSK.Headers.Main = guildHeader
 
--- Loot Drop ScrollFrame
 local lootScroll, lootChild, lootFrame, lootHeader =
-    CreateBorderedScrollFrame("PSKLootScrollFrame", frame, 240, -110, "Loot Drops (0)")
+    CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, -110, "Loot Drops (0)")
 PSK.ScrollFrames.Loot = lootScroll
 PSK.ScrollChildren.Loot = lootChild
 PSK.Headers.Loot = lootHeader
 
--- Bid List ScrollFrame
-
 local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
-
 local bidScroll, bidChild, bidFrame, bidHeader =
-    CreateBorderedScrollFrame("PSKBidScrollFrame", frame, 470, -110, "Bids (" .. bidCount .. ")", 220)
-
-
-
+    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, -110, "Bids (" .. bidCount .. ")", 220)
 PSK.ScrollFrames.Bid = bidScroll
 PSK.ScrollChildren.Bid = bidChild
 PSK.Headers.Bid = bidHeader
 
+-- Tabs
+PSK.Tabs = {}
+PanelTemplates_SetNumTabs(PSK.MainFrame, 2)
+
+local tab1 = CreateFrame("Button", "PSKMainFrameTab1", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
+tab1:SetID(1)
+tab1:SetText("PSK")
+tab1:SetPoint("BOTTOMLEFT", PSK.MainFrame, "BOTTOMLEFT", 10, -30)
+PanelTemplates_TabResize(tab1, 0)
+PSK.Tabs[1] = tab1
+
+local tab2 = CreateFrame("Button", "PSKMainFrameTab2", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
+tab2:SetID(2)
+tab2:SetText("Settings")
+tab2:SetPoint("LEFT", tab1, "RIGHT", -16, 0)
+PanelTemplates_TabResize(tab2, 0)
+PSK.Tabs[2] = tab2
+
+-- Settings tab UI
+local settingsTitle = PSK.SettingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+settingsTitle:SetPoint("TOP", 0, -40)
+settingsTitle:SetText("PSK Settings")
+
+local soundCheckbox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
+soundCheckbox:SetPoint("TOPLEFT", 20, -80)
+soundCheckbox.Text:SetText("Button Sounds")
+soundCheckbox:SetChecked(PSK.Settings.buttonSoundsEnabled)
+
+soundCheckbox:SetScript("OnClick", function(self)
+    local enabled = self:GetChecked()
+    PSK.Settings.buttonSoundsEnabled = enabled
+
+    -- Ensure PSKDB.Settings exists before we update it
+    if not PSKDB then PSKDB = {} end
+    if not PSKDB.Settings then PSKDB.Settings = {} end
+    PSKDB.Settings.buttonSoundsEnabled = enabled
+
+    print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
+end)
 
 
+-- Tab switching logic
+hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
+    local tabID = self:GetID()
+    PanelTemplates_SetTab(PSK.MainFrame, tabID)
 
-
-
-----------------------------------------
--- Refresh Loot List
-----------------------------------------
-
-function PSK:RefreshLootList()
-    if not PSK.LootDrops then return end
-
-	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-		PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0) -- clear highlight
-	end
-
-    local scrollChild = PSK.ScrollChildren.Loot
-    local header = PSK.Headers.Loot
-    if not scrollChild or not header then return end
-
-    -- Clear previous loot
-    for _, child in ipairs({scrollChild:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
+    if tabID == 1 then
+        PSK.ContentFrame:Show()
+        PSK.SettingsFrame:Hide()
+    else
+        PSK.ContentFrame:Hide()
+        PSK.SettingsFrame:Show()
     end
+end)
 
-    local yOffset = -5
-    for index, loot in ipairs(PSK.LootDrops) do
-        local row = CreateFrame("Button", nil, scrollChild)
-		row.bg = row:CreateTexture(nil, "BACKGROUND")
-		row.bg:SetAllPoints()
-		row.bg:SetColorTexture(0, 0, 0, 0) -- fully transparent by default
-        row:SetSize(240, 20)
-        row:SetPoint("TOP", 0, yOffset)
+-- Default selection
+PanelTemplates_SetTab(PSK.MainFrame, 1)
+PSK.ContentFrame:Show()
+PSK.SettingsFrame:Hide()
 
-        -- Icon
-        local iconTexture = row:CreateTexture(nil, "ARTWORK")
-        iconTexture:SetSize(16, 16)
-        iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
-        iconTexture:SetTexture(loot.itemTexture)
-
-        -- Item Link Text
-        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
-        itemText:SetText(loot.itemLink)
-
-        -- Highlight on click
-        row:SetScript("OnClick", function()
-			-- Deselect previous
-			if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-				PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
-			end
-
-			-- Select current
-			row.bg:SetColorTexture(0.2, 0.6, 1, 0.2) -- subtle blue
-			PSK.SelectedLootRow = row
-			PSK.SelectedItem = loot.itemLink
-			PSK.BidButton:Enable()
-
-			-- Announce
-			Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
-
-			-- Pulse animation
-			local pulse = row:CreateAnimationGroup()
-			local fadeOut = pulse:CreateAnimation("Alpha")
-			fadeOut:SetFromAlpha(1)
-			fadeOut:SetToAlpha(0.4)
-			fadeOut:SetDuration(0.2)
-			fadeOut:SetOrder(1)
-
-			local fadeIn = pulse:CreateAnimation("Alpha")
-			fadeIn:SetFromAlpha(0.4)
-			fadeIn:SetToAlpha(1)
-			fadeIn:SetDuration(0.2)
-			fadeIn:SetOrder(2)
-
-			pulse:SetLooping("NONE")
-			pulse:Play()
-		end)
-
-
-
-        yOffset = yOffset - 22
-    end
-
-    -- Update header
-    header:SetText("Loot Drops (" .. #PSK.LootDrops .. ")")
-end
-
-
-
-----------------------------------------
--- Refresh Guild List (for Main or Tier)
-----------------------------------------
-
-function PSK:RefreshGuildList()
-    if not PSKDB or not PSK.CurrentList then return end
-
-    local scrollChild = PSK.ScrollChildren.Main
-    local header = PSK.Headers.Main
-    if not scrollChild or not header then return end
-
-    -- Clear previous list
-    for _, child in ipairs({scrollChild:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-
-    local names = {}
-    if PSK.CurrentList == "Main" and PSKDB.MainList then
-        names = PSKDB.MainList
-    elseif PSK.CurrentList == "Tier" and PSKDB.TierList then
-        names = PSKDB.TierList
-    end
-
-    -- Update header text
-    header:SetText((PSK.CurrentList == "Main" and "PSK Main" or "PSK Tier") .. " (" .. #names .. ")")
-
-    local yOffset = -5
-    for index, name in ipairs(names) do
-        local row = CreateFrame("Button", nil, scrollChild)
-
-        row:SetSize(200, 20)
-        row:SetPoint("TOPLEFT", 0, yOffset)
-
-        -- Background for status glow
-        row.bg = row:CreateTexture(nil, "BACKGROUND")
-        row.bg:SetAllPoints()
-        row.bg:SetColorTexture(1, 0.5, 0, 0.2)
-        row.bg:Hide()
-
-        -- Pull real player info
-        local playerData = PSKDB.Players and PSKDB.Players[name]
-        local class = (playerData and playerData.class) or "SHAMAN"
-        local online = (playerData and playerData.online) or false
-        local inRaid = (playerData and playerData.inRaid) or false
-        local level = (playerData and playerData.level) or "???"
-        local zone = (playerData and playerData.zone) or "???"
-
-        row.playerData = {
-            class = class,
-            online = online,
-            inRaid = inRaid,
-            name = name,
-            level = level,
-            zone = zone,
-        }
-
-        -- Position
-        local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        posText:SetPoint("LEFT", row, "LEFT", 5, 0)
-        posText:SetText(index)
-
-        -- Class icon
-        local classIcon = row:CreateTexture(nil, "ARTWORK")
-        classIcon:SetSize(16, 16)
-        classIcon:SetPoint("LEFT", posText, "RIGHT", 8, 0)
-        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-        if CLASS_ICON_TCOORDS[class] then
-            classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
-        end
-
-        -- Name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
-        nameText:SetText(name)
-
-        -- Status
-        local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        statusText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
-
-        if inRaid then
-            statusText:SetText("In Raid")
-            statusText:SetTextColor(1, 0.5, 0)
-            row.bg:Show()
-            row.elapsed = 0
-            row:SetScript("OnUpdate", function(self, elapsed)
-                self.elapsed = (self.elapsed or 0) + elapsed
-                local alpha = 0.2 + 0.1 * math.sin(self.elapsed * 3)
-                self.bg:SetAlpha(alpha)
-            end)
-        elseif online then
-            statusText:SetText("Online")
-            statusText:SetTextColor(0, 1, 0)
-            row.bg:Hide()
-        else
-            statusText:SetText("Offline")
-            statusText:SetTextColor(0.5, 0.5, 0.5)
-            row.bg:Hide()
-            nameText:SetAlpha(0.5)
-            classIcon:SetAlpha(0.5)
-        end
-
-        -- Tooltip
-        row:SetScript("OnEnter", function(self)
-            if self.playerData then
-                GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
-                GameTooltip:ClearLines()
-                local tcoords = CLASS_ICON_TCOORDS[self.playerData.class or "WARRIOR"]
-                if tcoords then
-                    local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
-                        tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
-                    GameTooltip:AddLine(icon .. self.playerData.name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
-                else
-                    GameTooltip:AddLine(self.playerData.name or "Unknown")
-                end
-
-                GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
-                GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
-                GameTooltip:Show()
-            end
-        end)
-        row:SetScript("OnLeave", GameTooltip_Hide)
-
-        yOffset = yOffset - 22
-    end
-end
-
-
-----------------------------------------
--- Refresh Bid List
-----------------------------------------
-
-function PSK:RefreshBidList()
-    if not PSK.BidEntries then return end
-
-    local scrollChild = PSK.ScrollChildren.Bid
-    local header = PSK.Headers.Bid
-    if not scrollChild or not header then return end
-
-    -- Update header
-    local bidCount = #PSK.BidEntries
-    header:SetText("Bids (" .. bidCount .. ")")
-
-    -- Wipe list
-    for _, child in ipairs({scrollChild:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-
-    local yOffset = -5
-    for index, bidData in ipairs(PSK.BidEntries) do
-        local row = CreateFrame("Button", nil, scrollChild)
-		row.bg = row:CreateTexture(nil, "BACKGROUND")
-		row.bg:SetAllPoints()
-		row.bg:SetColorTexture(0, 0, 0, 0) -- Transparent by default
-		row.bg:Hide()
-
-        row:SetSize(220, 20)
-        row:SetPoint("TOPLEFT", 0, yOffset)
-        row:EnableMouse(true)
-
-        -- Position number
-        local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        posText:SetPoint("LEFT", row, "LEFT", 5, 0)
-        posText:SetText(bidData.position)
-
-        -- Class Icon
-        local class = bidData.class or "SHAMAN"
-        local classIcon = row:CreateTexture(nil, "ARTWORK")
-        classIcon:SetSize(16, 16)
-        classIcon:SetPoint("LEFT", posText, "RIGHT", 4, 0)
-        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-        if CLASS_ICON_TCOORDS[class] then
-            classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
-        end
-
-        -- Name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", classIcon, "RIGHT", 4, 0)
-        nameText:SetText(bidData.name)
-
-
-		-- Award Button (to the right of the name)
-		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		awardButton:SetSize(16, 16)
-		awardButton:SetPoint("LEFT", nameText, "RIGHT", 30, 0)
-		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
-		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		awardButton.index = index
-		awardButton:SetText("")
-		awardButton:SetFrameLevel(row:GetFrameLevel() + 1)
-		awardButton:SetScript("OnClick", function(self)
-			if self.index then
-				local row = self:GetParent()
-				if row and row.bg then
-					row.bg:SetColorTexture(0, 1, 0, 0.4) -- bright green
-					local pulse = row:CreateAnimationGroup()
-					local fadeOut = pulse:CreateAnimation("Alpha")
-					fadeOut:SetFromAlpha(1)
-					fadeOut:SetToAlpha(0)
-					fadeOut:SetDuration(0.4)
-					fadeOut:SetOrder(1)
-					local fadeIn = pulse:CreateAnimation("Alpha")
-					fadeIn:SetFromAlpha(0)
-					fadeIn:SetToAlpha(1)
-					fadeIn:SetDuration(0.4)
-					fadeIn:SetOrder(2)
-					pulse:SetLooping("NONE")
-					pulse:Play()
-				end
-				AwardPlayer(self.index)
-			end
-		end)
-		
-		awardButton:SetScript("OnEnter", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:SetColorTexture(0.2, 1, 0.2, 0.25)
-
-				row.bg:Show()
-			end
-
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Award Loot", 1, 1, 1)
-			GameTooltip:AddLine("Click to award loot to this player.", 0.8, 0.8, 0.8)
-			GameTooltip:Show()
-		end)
-
-		awardButton:SetScript("OnLeave", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:Hide()
-			end
-			GameTooltip:Hide()
-		end)
-
-
-		-- Pass Button (to the right of Award)
-		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		passButton:SetSize(16, 16)
-		passButton:SetPoint("LEFT", awardButton, "RIGHT", 15, 0)
-		passButton:SetFrameLevel(row:GetFrameLevel() + 1)
-
-		local passTexture = passButton:CreateTexture(nil, "ARTWORK")
-		passTexture:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-		passTexture:SetAllPoints(passButton)
-		passTexture:SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		passButton:SetNormalTexture(passTexture)
-
-		passButton.index = index
-		passButton:SetText("")
-		passButton:SetScript("OnClick", function(self)
-			if self.index then
-				table.remove(PSK.BidEntries, self.index)
-				PSK:RefreshBidList()
-			end
-		end)
-	
-		passButton:SetScript("OnEnter", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:SetColorTexture(1, 0.2, 0.2, 0.25)
-				row.bg:Show()
-			end
-
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Pass on Loot", 1, 1, 1)
-			GameTooltip:AddLine("Click to remove this player from bidding.", 0.8, 0.8, 0.8)
-			GameTooltip:Show()
-		end)
-
-		passButton:SetScript("OnLeave", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:Hide()
-			end
-			GameTooltip:Hide()
-		end)
-
-
-
-
-        yOffset = yOffset - 22
-    end
-end
-
-
-
-
+-- Refresh on load
 PSK:RefreshGuildList()
 PSK:RefreshBidList()
