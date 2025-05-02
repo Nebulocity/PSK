@@ -3,13 +3,12 @@
 local PSK = select(2, ...)
 
 -- For bidding
-if not PSKDB.MainList then
-    PSKDB.MainList = {}
-end
+if not PSKDB.MainList then PSKDB.MainList = {} end
+if not PSKDB.TierList then PSKDB.TierList = {} end
 
-if not PSKDB.TierList then
-    PSKDB.TierList = {}
-end
+BiddingOpen = false
+PSK.BidEntries = {}
+PSK.CurrentList = "Main"
 
 local CLASS_COLORS = RAID_CLASS_COLORS or {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
@@ -20,6 +19,7 @@ local CLASS_COLORS = RAID_CLASS_COLORS or {
     SHAMAN =  { r = 0.00, g = 0.44, b = 0.87 },
     MAGE =    { r = 0.25, g = 0.78, b = 0.92 },
     WARLOCK = { r = 0.53, g = 0.53, b = 0.93 },
+    MONK =    { r = 0.00, g = 1.00, b = 0.59 },
     DRUID =   { r = 1.00, g = 0.49, b = 0.04 },
 }
 
@@ -33,12 +33,16 @@ PSK.CurrentList = "Main"
 -- Zug zug
 ----------------------------------------
 
-function PlayRandomPeonSound()
+function PSK:PlayRandomPeonSound()
+    if not PSK.Settings or not PSK.Settings.buttonSoundsEnabled then
+        return false
+    end
+
     local normalSounds = {
         "Sound\\Creature\\Peon\\PeonYes1.ogg",
         "Sound\\Creature\\Peon\\PeonYes2.ogg",
     }
-    local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg" -- "Me not that kind of orc!"
+    local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg"
 
     if math.random(1, 100) <= 5 then
         PlaySoundFile(rareSound)
@@ -48,6 +52,7 @@ function PlayRandomPeonSound()
         return false
     end
 end
+
 
 
 ----------------------------------------
