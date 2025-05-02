@@ -67,43 +67,49 @@ end
 ----------------------------------------
 PSK.LootDrops = {} -- [1] {itemLink = "", itemTexture = "", itemName = "", itemID = number}
 
+----------------------------------------
+-- Record Loot
+----------------------------------------
+
 local lootFrame = CreateFrame("Frame")
-lootFrame:RegisterEvent("LOOT_OPENED")
+lootFrame:RegisterEvent("EVENT_LOOT_RECIEVED")
 
 lootFrame:SetScript("OnEvent", function(self, event)
-    if event == "LOOT_OPENED" then
-        PSK:CaptureLoot()
-    end
+    if event == "EVENT_LOOT_RECIEVED" then
+        if not IsMasterLooter() then return end
+			
+		local lootThreshold = GetLootThreshold()
+			
+		if itemQuality and itemQuality .> lootThreshold then
+			PSK.LootDrops = {}
+		
+			    local numItems = GetNumLootItems()
+			    local threshold = PSK.Settings.lootThreshold or 3
+			
+			    for i = 1, numItems do
+			        local itemLink = GetLootSlotLink(i)
+			        local itemTexture = GetLootSlotInfo(i)
+			
+			        if itemLink and itemTexture then
+			            local _, _, rarity = GetItemInfo(itemLink)
+			            if rarity and rarity >= threshold then
+			                table.insert(PSK.LootDrops, {
+			                    itemLink = itemLink,
+			                    itemTexture = itemTexture
+			                })
+			            end
+			        end
+			    end
+			
+			    PSK:RefreshLootList()
+		end	
+	end
 end)
 
-function PSK:CaptureLoot()
-    if not PSK.LootRecordingActive then return end
-    if not IsMasterLooter() then return end
 
-    PSK.LootDrops = {}
-
-    local numItems = GetNumLootItems()
-    local threshold = PSK.Settings.lootThreshold or 3
-
-    for i = 1, numItems do
-        local itemLink = GetLootSlotLink(i)
-        local itemTexture = GetLootSlotInfo(i)
-
-        if itemLink and itemTexture then
-            local _, _, rarity = GetItemInfo(itemLink)
-            if rarity and rarity >= threshold then
-                table.insert(PSK.LootDrops, {
-                    itemLink = itemLink,
-                    itemTexture = itemTexture
-                })
-            end
-        end
-    end
-
-    PSK:RefreshLootList()
-end
-
-
+----------------------------------------
+-- Only Record for Master Looter
+----------------------------------------
 
 local function IsMasterLooter()
 	local lootMethod = GetLootMethod()
