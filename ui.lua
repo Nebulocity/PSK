@@ -1,9 +1,16 @@
+
 local PSK = select(2, ...)
 
 -- Ensure settings exist
 if not PSKDB then PSKDB = {} end
-PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true }
+PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 3 }
 PSK.Settings = CopyTable(PSKDB.Settings)
+
+local LOOT_RARITY = {
+    Rare = 3,
+    Epic = 4,
+    Legendary = 5,
+}
 
 -- Initialize containers
 PSK.ScrollFrames = {}
@@ -105,6 +112,98 @@ soundCheckbox:SetScript("OnClick", function(self)
 
     print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
 end)
+
+
+-- Loot Threshold Label
+local thresholdLabel = PSK.SettingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+thresholdLabel:SetPoint("TOPLEFT", soundCheckbox, "BOTTOMLEFT", 0, -30)
+thresholdLabel:SetText("Loot Threshold:")
+
+-- Loot Threshold Dropdown
+local thresholdDropdown = CreateFrame("Frame", "PSKLootThresholdDropdown", PSK.SettingsFrame, "UIDropDownMenuTemplate")
+thresholdDropdown:SetPoint("TOPLEFT", thresholdLabel, "BOTTOMLEFT", -15, -5)
+UIDropDownMenu_SetWidth(thresholdDropdown, 150)
+
+local lootOptions = {
+    { text = "|cff0070ddRare (Blue)|r", value = 2 },
+    { text = "|cffa335eeEpic (Purple)|r", value = 3 },
+    { text = "|cffff8000Legendary (Orange)|r", value = 4 },
+}
+
+local function OnLootThresholdSelect(_, value)
+    PSK.Settings.lootThreshold = value
+    PSKDB.Settings.lootThreshold = value
+    UIDropDownMenu_SetSelectedValue(thresholdDropdown, value)
+    for _, option in ipairs(lootOptions) do
+        if option.value == value then
+            UIDropDownMenu_SetText(thresholdDropdown, option.text)
+            break
+        end
+    end
+    print("[PSK] Loot threshold set to " .. (value == 2 and "Rare" or value == 3 and "Epic" or "Legendary"))
+end
+
+UIDropDownMenu_Initialize(thresholdDropdown, function(self, level)
+    for _, option in ipairs(lootOptions) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = option.text
+        info.value = option.value
+        info.func = OnLootThresholdSelect
+        info.checked = (option.value == PSK.Settings.lootThreshold)
+        UIDropDownMenu_AddButton(info, level)
+    end
+end)
+
+-- AFTER initializing, set selection and text
+C_Timer.After(0, function()
+    UIDropDownMenu_SetSelectedValue(thresholdDropdown, PSK.Settings.lootThreshold)
+    for _, option in ipairs(lootOptions) do
+        if option.value == PSK.Settings.lootThreshold then
+            UIDropDownMenu_SetText(thresholdDropdown, option.text)
+            break
+        end
+    end
+end)
+
+
+UIDropDownMenu_SetWidth(thresholdDropdown, 150)
+
+-- UIDropDownMenu_SetSelectedValue(thresholdDropdown, PSK.Settings.lootThreshold)
+-- for _, option in ipairs(lootOptions) do
+    -- if option.value == PSK.Settings.lootThreshold then
+        -- UIDropDownMenu_SetText(thresholdDropdown, option.text)
+        -- break
+    -- end
+-- end
+
+
+-- Test Loot Threshold Button
+local testThresholdButton = CreateFrame("Button", nil, PSK.SettingsFrame, "GameMenuButtonTemplate")
+testThresholdButton:SetSize(160, 24)
+testThresholdButton:SetPoint("TOPLEFT", thresholdDropdown, "BOTTOMLEFT", 20, -10)
+testThresholdButton:SetText("Test Loot Threshold")
+
+testThresholdButton:SetScript("OnClick", function()
+    local threshold = PSK.Settings.lootThreshold or 3
+    local testItems = {
+        { name = "Green Sword", rarity = 1, color = "|cff1eff00" },
+        { name = "Blue Shield", rarity = 2, color = "|cff0070dd" },
+        { name = "Epic Wand", rarity = 3, color = "|cffa335ee" },
+        { name = "Legendary Helm", rarity = 4, color = "|cffff8000" },
+    }
+
+    print("|cffffff00[PSK]|r --- Testing Loot Threshold ---")
+    for _, item in ipairs(testItems) do
+        local coloredName = item.color .. item.name .. "|r"
+        if item.rarity >= threshold then
+            print("✔ Would record: " .. coloredName)
+        else
+            print("✘ Would skip: " .. coloredName)
+        end
+    end
+    print("|cffffff00[PSK]|r --- End Test ---")
+end)
+
 
 
 -- Tab switching logic

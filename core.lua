@@ -6,6 +6,13 @@ local PSK = select(2, ...)
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
 
+local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
+
+if rarity and rarity >= threshold then
+    -- add to loot
+end
+
+
 BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
@@ -70,25 +77,32 @@ lootFrame:SetScript("OnEvent", function(self, event)
 end)
 
 function PSK:CaptureLoot()
-	if not IsMasterLooter() then return end
+    if not PSK.LootRecordingActive then return end
+    if not IsMasterLooter() then return end
 
-	PSK.LootDrops = {}
+    PSK.LootDrops = {}
 
-	local numItems = GetNumLootItems()
-	for i = 1, numItems do
-		local itemLink = GetLootSlotLink(i)
-		local itemTexture = GetLootSlotInfo(i)
+    local numItems = GetNumLootItems()
+    local threshold = PSK.Settings.lootThreshold or 3
 
-		if itemLink and itemTexture then
-			table.insert(PSK.LootDrops, {
-				itemLink = itemLink,
-				itemTexture = itemTexture
-			})
-		end
-	end
+    for i = 1, numItems do
+        local itemLink = GetLootSlotLink(i)
+        local itemTexture = GetLootSlotInfo(i)
 
-	PSK:RefreshLootList()
+        if itemLink and itemTexture then
+            local _, _, rarity = GetItemInfo(itemLink)
+            if rarity and rarity >= threshold then
+                table.insert(PSK.LootDrops, {
+                    itemLink = itemLink,
+                    itemTexture = itemTexture
+                })
+            end
+        end
+    end
+
+    PSK:RefreshLootList()
 end
+
 
 
 local function IsMasterLooter()
