@@ -560,3 +560,21 @@ function PSK:RefreshBidList()
         yOffset = yOffset - 22
     end
 end
+
+----------------------------------------
+-- Get Loot Threshold
+----------------------------------------
+
+function PSK:GetLootThresholdName()
+	local threshold = GetLootThreshold()
+	local qualityNames = {
+		[0] = "Poor",
+		[1] = "Common",
+		[2] = "Uncommon",
+		[3] = "Rare",
+		[4] = "Epic",
+		[5] = "Legendary"
+	}
+
+	return qualityNames[threshold] or ("Unknown (" .. threshold .. ")")
+end
