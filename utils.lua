@@ -2,6 +2,11 @@
 -- Helper functions for PSK
 local PSK = select(2, ...)
 
+PSK.ScrollChildren = PSK.ScrollChildren or {}
+PSK.Headers = PSK.Headers or {}
+PSK.ScrollFrames = PSK.ScrollFrames or {}
+
+
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
@@ -194,17 +199,24 @@ end
 ----------------------------------------
 
 function PSK:RefreshLootList()
-    if not PSK.LootDrops then return end
+    if not PSKDB.LootLogs then return end
 
-	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-		PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0) -- clear highlight
-	end
+    -- Rebuild PSK.LootDrops from logs
+    -- PSK.LootDrops = {}
+    -- for _, log in ipairs(PSKDB.LootLogs) do
+        -- local itemName, _, _, _, _, _, _, _, _, icon = GetItemInfo(log.itemLink)
+        -- table.insert(PSK.LootDrops, {
+            -- itemLink = log.itemLink,
+            -- itemTexture = icon or "Interface\\Icons\\INV_Misc_QuestionMark",
+            -- itemName = itemName or "Unknown"
+        -- })
+    -- end
 
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
 
-    -- Clear previous loot
+    -- Clear previous children
     for _, child in ipairs({scrollChild:GetChildren()}) do
         child:Hide()
         child:SetParent(nil)
@@ -213,66 +225,117 @@ function PSK:RefreshLootList()
     local yOffset = -5
     for index, loot in ipairs(PSK.LootDrops) do
         local row = CreateFrame("Button", nil, scrollChild)
-		row.bg = row:CreateTexture(nil, "BACKGROUND")
-		row.bg:SetAllPoints()
-		row.bg:SetColorTexture(0, 0, 0, 0) -- fully transparent by default
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        row.bg:SetColorTexture(0, 0, 0, 0)
         row:SetSize(240, 20)
         row:SetPoint("TOP", 0, yOffset)
 
-        -- Icon
         local iconTexture = row:CreateTexture(nil, "ARTWORK")
         iconTexture:SetSize(16, 16)
         iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
         iconTexture:SetTexture(loot.itemTexture)
 
-        -- Item Link Text
         local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
         itemText:SetText(loot.itemLink)
 
-        -- Highlight on click
+        -- Click to highlight and select
         row:SetScript("OnClick", function()
-			-- Deselect previous
-			if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-				PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
-			end
+            if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+                PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
+            end
 
-			-- Select current
-			row.bg:SetColorTexture(0.2, 0.6, 1, 0.2) -- subtle blue
-			PSK.SelectedLootRow = row
-			PSK.SelectedItem = loot.itemLink
-			PSK.BidButton:Enable()
+            row.bg:SetColorTexture(0.2, 0.6, 1, 0.2)
+            PSK.SelectedLootRow = row
+            PSK.SelectedItem = loot.itemLink
+            PSK.BidButton:Enable()
 
-			-- Announce
-			Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
+            Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
 
-			-- Pulse animation
-			local pulse = row:CreateAnimationGroup()
-			local fadeOut = pulse:CreateAnimation("Alpha")
-			fadeOut:SetFromAlpha(1)
-			fadeOut:SetToAlpha(0.4)
-			fadeOut:SetDuration(0.2)
-			fadeOut:SetOrder(1)
+            local pulse = row:CreateAnimationGroup()
+            local fadeOut = pulse:CreateAnimation("Alpha")
+            fadeOut:SetFromAlpha(1)
+            fadeOut:SetToAlpha(0.4)
+            fadeOut:SetDuration(0.2)
+            fadeOut:SetOrder(1)
 
-			local fadeIn = pulse:CreateAnimation("Alpha")
-			fadeIn:SetFromAlpha(0.4)
-			fadeIn:SetToAlpha(1)
-			fadeIn:SetDuration(0.2)
-			fadeIn:SetOrder(2)
+            local fadeIn = pulse:CreateAnimation("Alpha")
+            fadeIn:SetFromAlpha(0.4)
+            fadeIn:SetToAlpha(1)
+            fadeIn:SetDuration(0.2)
+            fadeIn:SetOrder(2)
 
-			pulse:SetLooping("NONE")
-			pulse:Play()
-		end)
-
-
+            pulse:SetLooping("NONE")
+            pulse:Play()
+        end)
 
         yOffset = yOffset - 22
     end
 
     -- Update header
-    header:SetText("Loot Drops (" .. #PSK.LootDrops .. ")")
+    local threshold = PSK.Settings.lootThreshold or 3
+    local rarityNames = {
+        [0] = "Poor", [1] = "Common", [2] = "Uncommon",
+        [3] = "Rare", [4] = "Epic", [5] = "Legendary"
+    }
+    local rarityName = rarityNames[threshold] or "?"
+    header:SetText("Loot Drops (" .. #PSK.LootDrops .. ") " .. rarityName .. "+")
 end
 
+
+function PSK:RefreshLogList()
+    if not PSKDB.LootLogs then return end
+
+    local scrollChild = PSK.ScrollChildren.Logs
+    local header = PSK.Headers.Logs
+    if not scrollChild or not header then return end
+
+    -- Clear previous children
+    for _, child in ipairs({scrollChild:GetChildren()}) do
+        child:Hide()
+        child:SetParent(nil)
+    end
+
+    local yOffset = -5
+    for index = #PSKDB.LootLogs, 1, -1 do -- newest first
+        local log = PSKDB.LootLogs[index]
+
+        local row = CreateFrame("Frame", nil, scrollChild)
+        row:SetSize(650, 20)
+        row:SetPoint("TOPLEFT", 0, yOffset)
+
+        -- Class icon (optional; skip if not using for now)
+        --[[
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(16, 16)
+        icon:SetPoint("LEFT", row, "LEFT", 5, 0)
+        PSK:SetClassIcon(icon, log.class)
+        ]]
+
+        -- Player Name
+        local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        playerText:SetPoint("LEFT", row, "LEFT", 5, 0)
+        playerText:SetText(log.player)
+
+        -- Item Link
+        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        itemText:SetPoint("LEFT", playerText, "RIGHT", 10, 0)
+        itemText:SetText(log.itemLink)
+
+        -- Timestamp
+        local timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        timeText:SetPoint("LEFT", row, "LEFT", 480, 0)
+        timeText:SetText(log.timestamp)
+
+        yOffset = yOffset - 22
+    end
+
+    -- Optional header update
+    if header then
+        header:SetText("Loot Log (" .. #PSKDB.LootLogs .. ")")
+    end
+end
 
 
 ----------------------------------------
@@ -560,3 +623,25 @@ function PSK:RefreshBidList()
         yOffset = yOffset - 22
     end
 end
+
+----------------------------------------
+-- Get Loot Threshold
+----------------------------------------
+
+function PSK:GetLootThresholdName()
+	local threshold = GetLootThreshold()
+	local qualityNames = {
+		[0] = "Poor",
+		[1] = "Common",
+		[2] = "Uncommon",
+		[3] = "Rare",
+		[4] = "Epic",
+		[5] = "Legendary"
+	}
+
+	return qualityNames[threshold] or ("Unknown (" .. threshold .. ")")
+end
+
+
+PSK:RefreshLootList()
+PSK:RefreshLogList()

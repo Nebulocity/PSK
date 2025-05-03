@@ -1,28 +1,25 @@
 -- core.lua
 
 local PSK = select(2, ...)
+PSK.LootDrops = PSK.LootDrops or {}
 
--- For bidding
+-- For Tracking
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
+if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
+
+
+
+local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
+
+if rarity and rarity > threshold then
+    -- add to loot
+end
+
 
 BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
-
-local CLASS_COLORS = RAID_CLASS_COLORS or {
-    WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
-    PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
-    HUNTER =  { r = 0.67, g = 0.83, b = 0.45 },
-    ROGUE =   { r = 1.00, g = 0.96, b = 0.41 },
-    PRIEST =  { r = 1.00, g = 1.00, b = 1.00 },
-    SHAMAN =  { r = 0.00, g = 0.44, b = 0.87 },
-    MAGE =    { r = 0.25, g = 0.78, b = 0.92 },
-    WARLOCK = { r = 0.53, g = 0.53, b = 0.93 },
-    MONK =    { r = 0.00, g = 1.00, b = 0.59 },
-    DRUID =   { r = 1.00, g = 0.49, b = 0.04 },
-}
-
 
 -- Main Variables
 BiddingOpen = false
@@ -60,39 +57,80 @@ end
 ----------------------------------------
 PSK.LootDrops = {} -- [1] {itemLink = "", itemTexture = "", itemName = "", itemID = number}
 
-local lootFrame = CreateFrame("Frame")
-lootFrame:RegisterEvent("LOOT_OPENED")
+----------------------------------------
+-- Record Loot
+----------------------------------------
 
-lootFrame:SetScript("OnEvent", function(self, event)
-    if event == "LOOT_OPENED" then
-        PSK:CaptureLoot()
+local lootFrame = CreateFrame("Frame") 
+lootFrame:RegisterEvent("CHAT_MSG_LOOT")
+
+lootFrame:SetScript("OnEvent", function(self, event, msg)
+    if PSK.LootRecordingActive then
+        local player, itemLink = msg:match("([^%s]+) receives loot: (.+)")
+        if not itemLink then
+            itemLink = msg:match("You receive loot: (.+)")
+            player = UnitName("player")
+        end
+
+        if itemLink then
+            print("[PSK DEBUG] Loot message matched. Player:", player, "Item:", itemLink)
+
+            C_Timer.After(0.2, function()
+                local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
+                local threshold = PSK.Settings.lootThreshold or 3
+
+                print("[PSK DEBUG] Item:", itemName or "nil", "Rarity:", rarity or "nil", "Threshold:", threshold)
+
+                if rarity and rarity >= threshold then
+                    print("[PSK DEBUG] Rarity is sufficient, logging loot.")
+
+                    table.insert(PSK.LootDrops, {
+                        itemLink = itemLink,
+                        itemTexture = icon
+                    })
+                    PSK:RefreshLootList()
+
+                    if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
+                    local class = PSKDB.Players[player] and PSKDB.Players[player].class or "SHAMAN"
+					
+					local hour, minute = GetGameTime()
+					local ampm = (hour >= 12) and "PM" or "AM"
+					hour = (hour % 12 == 0) and 12 or (hour % 12)
+					local timeString = string.format("%d:%02d%s", hour, minute, ampm)
+					local dateString = date("%m/%d/%Y")  -- still uses system date
+					local fullTimestamp = timeString .. " " .. dateString
+					timestamp = fullTimestamp
+
+
+
+                    table.insert(PSKDB.LootLogs, {
+                        player = player,
+                        class = class,
+                        itemLink = itemLink,
+                        timestamp = date("%Y-%m-%d %H:%M:%S")
+                    })
+
+                    if PSK.RefreshLogList then
+                        PSK:RefreshLogList()
+                    end
+                else
+                    print("[PSK DEBUG] Rarity not high enough or unknown. Skipping log.")
+                end
+            end)
+        end
     end
 end)
 
-function PSK:CaptureLoot()
-	if not IsMasterLooter() then return end
 
-	PSK.LootDrops = {}
 
-	local numItems = GetNumLootItems()
-	for i = 1, numItems do
-		local itemLink = GetLootSlotLink(i)
-		local itemTexture = GetLootSlotInfo(i)
 
-		if itemLink and itemTexture then
-			table.insert(PSK.LootDrops, {
-				itemLink = itemLink,
-				itemTexture = itemTexture
-			})
-		end
-	end
 
-	PSK:RefreshLootList()
-end
-
+----------------------------------------
+-- Only Record for Master Looter
+----------------------------------------
 
 local function IsMasterLooter()
-	local lootMethod = GetLootMethod()
+	-- local lootMethod = GetLootMethod()
 	return lootMethod == "master"
 end
 
@@ -146,6 +184,9 @@ function UpdateGuildData()
     PSK:RefreshBidList()
 end
 
+-- The rest of the file remains unchanged
+
+
 ----------------------------------------
 -- Bidding System 
 ----------------------------------------
@@ -155,6 +196,11 @@ function PSK:StartBidding()
 		
 	if not PSK.SelectedItem then
 		print("You must select an item before starting bidding.")
+		
+		if not PSK.Settings or not PSK.Settings.buttonSoundsEnabled then
+			return false
+		end
+	
 		PlaySound(SOUNDKIT.GS_TITLE_OPTION_EXIT)
 		return
 	end
