@@ -201,17 +201,6 @@ end
 function PSK:RefreshLootList()
     if not PSKDB.LootLogs then return end
 
-    -- Rebuild PSK.LootDrops from logs
-    -- PSK.LootDrops = {}
-    -- for _, log in ipairs(PSKDB.LootLogs) do
-        -- local itemName, _, _, _, _, _, _, _, _, icon = GetItemInfo(log.itemLink)
-        -- table.insert(PSK.LootDrops, {
-            -- itemLink = log.itemLink,
-            -- itemTexture = icon or "Interface\\Icons\\INV_Misc_QuestionMark",
-            -- itemName = itemName or "Unknown"
-        -- })
-    -- end
-
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
@@ -229,7 +218,7 @@ function PSK:RefreshLootList()
         row.bg:SetAllPoints()
         row.bg:SetColorTexture(0, 0, 0, 0)
         row:SetSize(240, 20)
-        row:SetPoint("TOP", 0, yOffset)
+        row:SetPoint("TOP", 30, yOffset)
 
         local iconTexture = row:CreateTexture(nil, "ARTWORK")
         iconTexture:SetSize(16, 16)
@@ -238,7 +227,19 @@ function PSK:RefreshLootList()
 
         local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
-        itemText:SetText(loot.itemLink)
+
+		-- Hover over item
+		itemText:SetText(loot.itemLink)
+		itemText:SetScript("OnEnter", function()
+			GameTooltip:SetOwner(itemText, "ANCHOR_RIGHT")
+			GameTooltip:SetHyperlink(loot.itemLink)
+			GameTooltip:Show()
+		end)
+
+		itemText:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+
 
         -- Click to highlight and select
         row:SetScript("OnClick", function()
@@ -318,10 +319,37 @@ function PSK:RefreshLogList()
         playerText:SetPoint("LEFT", row, "LEFT", 5, 0)
         playerText:SetText(log.player)
 
-        -- Item Link
-        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemText:SetPoint("LEFT", playerText, "RIGHT", 10, 0)
-        itemText:SetText(log.itemLink)
+		-- Get the item texture if it wasn't recorded earlier.
+		if not log.itemTexture and log.itemLink then
+			local _, _, _, _, _, _, _, _, _, fetchedIcon = GetItemInfo(log.itemLink)
+			log.itemTexture = fetchedIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
+		end
+
+		
+		-- Item icon
+		local iconTexture = row:CreateTexture(nil, "ARTWORK")
+		iconTexture:SetSize(16, 16)
+		iconTexture:SetPoint("LEFT", playerText, "RIGHT", 6, 0)
+		iconTexture:SetTexture(log.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
+
+		-- Item link
+		local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		itemText:SetPoint("LEFT", iconTexture, "RIGHT", 6, 0)
+		itemText:SetText(log.itemLink)
+		itemText:SetScript("OnEnter", function()
+			GameTooltip:SetOwner(itemText, "ANCHOR_RIGHT")
+			GameTooltip:SetHyperlink(log.itemLink)
+			GameTooltip:Show()
+		end)
+		itemText:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+
+
+		itemText:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+
 
         -- Timestamp
         local timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")

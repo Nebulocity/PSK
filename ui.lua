@@ -212,6 +212,7 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
 	OnAccept = function()
 		wipe(PSK.LootDrops)
 		PSK:RefreshLootList()
+		PSK:RefreshLogList()
 	end
 }
 
@@ -224,3 +225,10 @@ PSK.SettingsFrame:Hide()
 -- Refresh on load
 PSK:RefreshGuildList()
 PSK:RefreshBidList()
+
+C_Timer.After(0.1, function()
+    if PSK.RefreshLogList then
+        PSK:RefreshLogList()
+    end
+end)
+
