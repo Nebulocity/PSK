@@ -1,15 +1,27 @@
 -- core.lua
 
+-- core.lua, right at the top
+-- At the top of core.lua
 local PSK = select(2, ...)
-PSK.LootDrops = PSK.LootDrops or {}
-PSK.LootLog = PSK.LootDrops or {}
+_G.PSKGlobal = _G.PSKGlobal or {}
+
+-- Initialize saved variables
+PSKDB = PSKDB or {}
+
+-- Use the persistent loot drop list
+PSKGlobal.LootDrops = PSKGlobal.LootDrops or {}
+PSK.LootDrops = PSKGlobal.LootDrops
+
+-- Also initialize logs etc
+PSKDB.LootLogs = PSKDB.LootLogs or {}
+
+
 
 -- For Tracking
 PSKDB = PSKDB or {}             
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
-if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
-if not PSKDB.LootDrops then PSKDB.LootDrops = {} end
+
 
 
 local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
@@ -55,11 +67,6 @@ end
 
 
 ----------------------------------------
--- Storage for current loot drops
-----------------------------------------
-PSK.LootDrops = {} -- [1] {itemLink = "", itemTexture = "", itemName = "", itemID = number}
-
-----------------------------------------
 -- Record Loot
 ----------------------------------------
 
@@ -86,14 +93,28 @@ lootFrame:SetScript("OnEvent", function(self, event, msg)
                 if rarity and rarity >= threshold then
                     print("[PSK DEBUG] Rarity is sufficient, logging loot.")
 
-                    table.insert(PSK.LootDrops, {
-                        itemLink = itemLink,
-                        itemTexture = icon
-                    })
+                    if not PSKDB.LootDrops then PSKDB.LootDrops = {} end
+
+					-- table.insert(PSK.LootDrops, {
+						-- itemLink = itemLink,
+						-- itemTexture = icon
+					-- })
+
+					if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
+                    local class = PSKDB.Players[player] and PSKDB.Players[player].class or "SHAMAN"
+					
+					table.insert(PSKGlobal.LootDrops, {
+						itemLink = itemLink,
+						itemTexture = icon,
+						player = player,
+						class = class,
+						timestamp = date("%I:%M %p %m/%d/%Y")
+					})
+
+
                     PSK:RefreshLootList()
 
-                    if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
-                    local class = PSKDB.Players[player] and PSKDB.Players[player].class or "SHAMAN"
+                    
 					
 					local hour, minute = GetGameTime()
 					local ampm = (hour >= 12) and "PM" or "AM"
@@ -102,17 +123,6 @@ lootFrame:SetScript("OnEvent", function(self, event, msg)
 					local dateString = date("%m/%d/%Y")  -- still uses system date
 					local fullTimestamp = timeString .. " " .. dateString
 					timestamp = fullTimestamp
-
-
-
-                    table.insert(PSKDB.LootLogs, {
-						player = player,
-						class = class,
-						itemLink = itemLink,
-						itemTexture = icon, 
-						timestamp = date("%I:%M%p %m/%d/%Y")
-					})
-
 
 
                     if PSK.RefreshLogList then
@@ -227,29 +237,51 @@ function PSK:StartBidding()
 	
     local listName = (PSK.CurrentList == "Tier") and "Tier List" or "Main List"
     
-	Announce("[PSK] Bidding has started for the " .. listName .. "! 90 seconds remaining.")
+	local itemLink = PSK.SelectedItem
+	local itemName = GetItemInfo(itemLink) or itemLink
+	Announce("[PSK] Bidding has started for " .. itemName .. "! 15 seconds remaining.")
 
-	C_Timer.After(30, function()
+
+
+	C_Timer.After(5, function()
 		if BiddingOpen then
-			Announce("[PSK] 60 seconds left to bid!")
+			Announce("[PSK] 10 seconds left to bid!")
 		end
 	end)
 
-	C_Timer.After(60, function()
+	C_Timer.After(10, function()
 		if BiddingOpen then
-			Announce("[PSK] 30 seconds left to bid!")
+			Announce("[PSK] 5 seconds left to bid!")
 		end
 	end)
 
-	C_Timer.After(75, function()
+	C_Timer.After(11, function()
 		if BiddingOpen then
-			Announce("[PSK] 15 seconds left to bid!")
+			Announce("[PSK] 4 seconds left to bid!")
+		end
+	end)
+	
+	C_Timer.After(12, function()
+		if BiddingOpen then
+			Announce("[PSK] 3 seconds left to bid!")
+		end
+	end)
+	
+	C_Timer.After(13, function()
+		if BiddingOpen then
+			Announce("[PSK] 2 seconds left to bid!")
+		end
+	end)
+	
+	C_Timer.After(14, function()
+		if BiddingOpen then
+			Announce("[PSK] 1 seconds left to bid!")
 		end
 	end)
 
-	C_Timer.After(90, function()
+	C_Timer.After(15, function()
 		if BiddingOpen then
-			CloseBidding()
+			PSK:CloseBidding()
 		end
 	end)
 
@@ -258,22 +290,21 @@ function PSK:StartBidding()
 end
 
 function PSK:CloseBidding()
-    BiddingOpen = false 
+    BiddingOpen = false
+    PSK.BidButton:SetText("Start Bidding")
+    PSK:RefreshBidList()
 
-    Announce("[PSK] Bidding closed!")
-	
-	if PSK.BidButton then
-        PSK.BidButton:SetText("Start Bidding")
-        
-		if PSK.BidButton.Border then
-            PSK.BidButton.Border.Pulse:Stop()
-            PSK.BidButton.Border:SetAlpha(1) -- Reset after stopping animation
-            PSK.BidButton.Border:Hide()
+    if #PSK.BidEntries == 0 then
+        Announce("[PSK] No bids were placed.")
+    else
+        Announce("[PSK] Bidding closed. Bidders:")
+        for _, entry in ipairs(PSK.BidEntries) do
+            local line = string.format("%d. %s", entry.position, entry.name)
+            Announce(line)
         end
     end
-	
-    PSK:RefreshBidList()
 end
+
 
 local chatFrame = CreateFrame("Frame")
 chatFrame:RegisterEvent("CHAT_MSG_RAID")
@@ -292,6 +323,11 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
     if msg:find("bid") then
         local simpleName = sender:match("^(.-)%-.+") or sender
         AddBid(simpleName)
+    end
+	
+	if msg:find("retract") then
+        local simpleName = sender:match("^(.-)%-.+") or sender
+        RetractBid(simpleName)
     end
 end)
 
@@ -325,6 +361,18 @@ function AddBid(name)
 
             PSK:RefreshBidList()
             break
+        end
+    end
+end
+
+function RetractBid(name)
+    if not name then return end
+
+    for i, entry in ipairs(PSK.BidEntries) do
+        if entry.name == name then
+            table.remove(PSK.BidEntries, i)
+            PSK:RefreshBidList()
+            return
         end
     end
 end

@@ -1,6 +1,7 @@
 
 local PSK = select(2, ...)
 
+
 -- Ensure settings exist
 if not PSKDB then PSKDB = {} end
 PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 1 } -- change to 3 for rare
@@ -140,7 +141,8 @@ local rarityNames = {
 local rarityName = rarityNames[threshold] or "?"
 local upArrow = "|TInterface\\AddOns\\PSK\\media\\arrow_up.tga:24:24|t"
 local dropCount = #PSK.LootDrops
-lootHeader:SetText("Loot Drops (" .. #PSK.LootDrops .. ") " .. rarityName .. "+")
+lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
+
 
 
 
@@ -262,10 +264,11 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
     button1 = "Yes",
     button2 = "Cancel",
 	OnAccept = function()
-		wipe(PSK.LootDrops)
+		wipe(PSKDB.LootDrops)
+		PSK.LootDrops = PSKDB.LootDrops
 		PSK:RefreshLootList()
-		PSK:RefreshLogList()
 	end
+
 }
 
 

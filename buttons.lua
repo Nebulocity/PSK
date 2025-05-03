@@ -1,5 +1,5 @@
 local PSK = select(2, ...)
-
+_G.PSKGlobal = PSK
 
 -- Switch Main/Tier List Button
 PSK.ToggleListButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")

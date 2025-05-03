@@ -40,72 +40,98 @@ end
 function PerformAward(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
+    local playerClass = playerEntry and playerEntry.class
     local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
+    local item = PSKGlobal.LootDrops[index] -- use this as the main item table
 
-	-- Fade out the selected loot row
-	if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-		local row = PSK.SelectedLootRow
-		local fade = row:CreateAnimationGroup()
-		local fadeOut = fade:CreateAnimation("Alpha")
-		fadeOut:SetFromAlpha(1)
-		fadeOut:SetToAlpha(0)
-		fadeOut:SetDuration(0.5)
-		fadeOut:SetOrder(1)
+    -- Defensive fallback
+    if not item then
+        print("[PSK] Error: No loot item found at index", index)
+        return
+    end
 
-		fade:SetScript("OnFinished", function()
-			-- After fade completes, clear the selection
-			row.bg:SetColorTexture(0, 0, 0, 0)
-			PSK.SelectedLootRow = nil
-			PSK.SelectedItem = nil
-			if not BiddingOpen then
-				PSK.BidButton:Disable()
-			end
+    -- Animate selected loot row fading out
+    if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+        local row = PSK.SelectedLootRow
+        local fade = row:CreateAnimationGroup()
+        local fadeOut = fade:CreateAnimation("Alpha")
+        fadeOut:SetFromAlpha(1)
+        fadeOut:SetToAlpha(0)
+        fadeOut:SetDuration(0.5)
+        fadeOut:SetOrder(1)
 
-			PSK.LootDrops = {}
-			PSK:RefreshLootList()
-		end)
+        fade:SetScript("OnFinished", function()
+            row.bg:SetColorTexture(0, 0, 0, 0)
+            PSK.SelectedLootRow = nil
+            PSK.SelectedItem = nil
+            if not BiddingOpen then
+                PSK.BidButton:Disable()
+            end
+            PSK:RefreshLootList()
+        end)
 
-		fade:Play()
-	else
-		-- If no selected row, just fallback clear logic
-		PSK.SelectedLootRow = nil
-		PSK.SelectedItem = nil
-		
-		if not BiddingOpen then
-			PSK.BidButton:Disable()
-		end
+        fade:Play()
+    else
+        PSK.SelectedLootRow = nil
+        PSK.SelectedItem = nil
+        if not BiddingOpen then
+            PSK.BidButton:Disable()
+        end
+        PSK:RefreshLootList()
+    end
 
-		PSK.LootDrops = {}
-		PSK:RefreshLootList()
-	end
-
+    -- Remove from bidsbids
     table.remove(PSK.BidEntries, index)
 
-    local found = false
+    -- Move awarded player to end of list
     for i = #list, 1, -1 do
         if list[i]:lower() == playerName:lower() then
             table.remove(list, i)
-            found = true
             break
         end
     end
-
     table.insert(list, playerName)
 
-	local item = PSK.SelectedItem
-	if item then
-		Announce("[PSK] " .. playerName .. " receives " .. item .. "!")
+    -- Announce
+    -- Determine awarded item and announce
+	local itemLink = PSK.SelectedItem
+	local itemID = itemLink and tonumber(itemLink:match("item:(%d+)"))
+
+	-- Get class color
+	local color = RAID_CLASS_COLORS[playerClass or "PRIEST"] or { r = 1, g = 1, b = 1 }
+	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
+
+	-- Announce
+	if itemLink then
+		Announce(string.format("[PSK] %s receives %s!", coloredName, itemLink))
 	else
-		Announce("[PSK] " .. playerName .. " receives loot.")
+		Announce(string.format("[PSK] %s receives loot.", coloredName))
 	end
 
 
+    -- Log the award
+    table.insert(PSKDB.LootLogs, {
+        player = playerName,
+        class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "PRIEST",
+        itemLink = item.itemLink,
+        itemTexture = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark",
+        timestamp = date("%I:%M%p %m/%d/%Y"),
+    })
+
+    -- Remove from visible + persistent loot lists
+    table.remove(PSK.LootDrops, index)
+    table.remove(PSKGlobal.LootDrops, index)
+
+    if PSK.RefreshLogList then
+        PSK:RefreshLogList()
+    end
+
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
-		
     PSK:RefreshGuildList()
     PSK:RefreshBidList()
     PlaySound(12867)
 end
+
 
 
 -- Pass action (just clears selection)
@@ -136,12 +162,14 @@ end
 
 function Announce(message)
 	if IsInRaid() then
-		--SendChatMessage(message, "RAID")
+		SendChatMessage(message, "RAID")
+	elseif IsInGroup() then
 		SendChatMessage(message, "PARTY")
 	else
 		print(message)
 	end
 end
+
 
 
 function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
@@ -191,38 +219,41 @@ function PSK:RefreshLootList()
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
 
+    print("[PSK DEBUG] Refreshing Global Loot List. LootDrops count:", #PSKGlobal.LootDrops)
+
     -- Clear previous children
     for _, child in ipairs({scrollChild:GetChildren()}) do
         child:Hide()
         child:SetParent(nil)
     end
 
-	if PSK.RecordingWarningDrops then
-		if not PSK.LootRecordingActive then
-			PSK.RecordingWarningDrops:Show()
-			if not PSK.RecordingWarningDrops.pulse:IsPlaying() then
-				PSK.RecordingWarningDrops.pulse:Play()
-			end
-		else
-			PSK.RecordingWarningDrops:Hide()
-			PSK.RecordingWarningDrops.pulse:Stop()
-		end
-	end
+    if PSK.RecordingWarningDrops then
+        if not PSK.LootRecordingActive then
+            PSK.RecordingWarningDrops:Show()
+            if not PSK.RecordingWarningDrops.pulse:IsPlaying() then
+                PSK.RecordingWarningDrops.pulse:Play()
+            end
+        else
+            PSK.RecordingWarningDrops:Hide()
+            PSK.RecordingWarningDrops.pulse:Stop()
+        end
+    end
 
-	if PSK.RecordingWarningLogs then
-		if not PSK.LootRecordingActive then
-			PSK.RecordingWarningLogs:Show()
-			if not PSK.RecordingWarningLogs.pulse:IsPlaying() then
-				PSK.RecordingWarningLogs.pulse:Play()
-			end
-		else
-			PSK.RecordingWarningLogs:Hide()
-			PSK.RecordingWarningLogs.pulse:Stop()
-		end
-	end
-	
+    if PSK.RecordingWarningLogs then
+        if not PSK.LootRecordingActive then
+            PSK.RecordingWarningLogs:Show()
+            if not PSK.RecordingWarningLogs.pulse:IsPlaying() then
+                PSK.RecordingWarningLogs.pulse:Play()
+            end
+        else
+            PSK.RecordingWarningLogs:Hide()
+            PSK.RecordingWarningLogs.pulse:Stop()
+        end
+    end
+
     local yOffset = -5
-    for index, loot in ipairs(PSK.LootDrops) do
+
+    for index, loot in ipairs(PSKGlobal.LootDrops) do
         local row = CreateFrame("Button", nil, scrollChild)
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints()
@@ -235,35 +266,28 @@ function PSK:RefreshLootList()
         iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
         iconTexture:SetTexture(loot.itemTexture)
 
-        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
+        -- Make row clickable and show tooltip
+        row:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(loot.itemLink)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
 
-		-- Hover over item
-		itemText:SetText(loot.itemLink)
-		itemText:SetScript("OnEnter", function()
-			GameTooltip:SetOwner(itemText, "ANCHOR_RIGHT")
-			GameTooltip:SetHyperlink(loot.itemLink)
-			GameTooltip:Show()
-		end)
-
-		itemText:SetScript("OnLeave", function()
-			GameTooltip:Hide()
-		end)
-
-
-        -- Click to highlight and select
         row:SetScript("OnClick", function()
             if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
                 PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
             end
-
             row.bg:SetColorTexture(0.2, 0.6, 1, 0.2)
             PSK.SelectedLootRow = row
             PSK.SelectedItem = loot.itemLink
+            PSK.SelectedItemData = loot  -- Store the full loot item data
             PSK.BidButton:Enable()
-
             Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
 
+            -- Pulse animation
             local pulse = row:CreateAnimationGroup()
             local fadeOut = pulse:CreateAnimation("Alpha")
             fadeOut:SetFromAlpha(1)
@@ -281,6 +305,11 @@ function PSK:RefreshLootList()
             pulse:Play()
         end)
 
+        -- Add the FontString for visual text
+        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
+        itemText:SetText(loot.itemLink)
+
         yOffset = yOffset - 22
     end
 
@@ -291,8 +320,9 @@ function PSK:RefreshLootList()
         [3] = "Rare", [4] = "Epic", [5] = "Legendary"
     }
     local rarityName = rarityNames[threshold] or "?"
-    header:SetText("Loot Drops (" .. #PSK.LootDrops .. ") " .. rarityName .. "+")
+    header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
 end
+
 
 
 function PSK:RefreshLogList()
@@ -710,5 +740,8 @@ function PSK:GetLootThresholdName()
 end
 
 
-PSK:RefreshLootList()
+if PSK.RefreshLootList then
+    PSK:RefreshLootList()
+end
+
 PSK:RefreshLogList()
