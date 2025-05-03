@@ -40,12 +40,29 @@ PSK.LootRecordingActive = false
 
 PSK.RecordLootButton:SetScript("OnClick", function(self)
     PSK.LootRecordingActive = not PSK.LootRecordingActive
+	
     if PSK.LootRecordingActive then
         self:SetText("Stop Recording")
-        print("[PSK] Loot recording started.")
+
+		if PSK.RecordingWarningDrops then
+			PSK.RecordingWarningDrops:Hide()
+		end
+		
+		if PSK.RecordingWarningLogs then
+			PSK.RecordingWarningLogs:Hide()
+		end
+		
     else
         self:SetText("Record Loot")
-        print("[PSK] Loot recording stopped.")
+        
+		if PSK.RecordingWarningDrops then
+			PSK.RecordingWarningDrops:Show()
+		end
+		
+		if PSK.RecordingWarningLogs then
+			PSK.RecordingWarningLogs:Show()
+		end
+		
     end
 end)
 

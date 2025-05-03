@@ -66,23 +66,52 @@ local guildScroll, guildChild, guildFrame, guildHeader =
     CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, -110, "PSK Main (" .. mainListCount .. ")")
 PSK.ScrollFrames.Main = guildScroll
 PSK.ScrollChildren.Main = guildChild
+guildHeader:ClearAllPoints()
+guildHeader:SetPoint("TOPLEFT", guildScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Main = guildHeader
 
 local lootScroll, lootChild, lootFrame, lootHeader =
     CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, -110, "Loot Drops (0)")
 PSK.ScrollFrames.Loot = lootScroll
 PSK.ScrollChildren.Loot = lootChild
+lootHeader:ClearAllPoints()
+lootHeader:SetPoint("TOPLEFT", lootScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Loot = lootHeader
 
--- Trash can button
-local clearLootButton = CreateFrame("Button", nil, lootHeader:GetParent(), "UIPanelButtonTemplate")
-clearLootButton:SetSize(24, 24)
-clearLootButton:SetPoint("LEFT", lootHeader, "RIGHT", 6, 0)
 
-clearLootButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
-clearLootButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
-clearLootButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+-- Flashing red warning above Loot Drops
+local lootRecordingWarning = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+lootRecordingWarning:SetPoint("BOTTOMLEFT", lootHeader, "TOPLEFT", 30, 4)
+lootRecordingWarning:SetText("Loot is not being recorded!")
+lootRecordingWarning:SetTextColor(1, 0, 0)
+lootRecordingWarning:Hide()
 
+-- Pulse animation
+local lootPulse = lootRecordingWarning:CreateAnimationGroup()
+local lootFadeOut = lootPulse:CreateAnimation("Alpha")
+lootFadeOut:SetFromAlpha(1)
+lootFadeOut:SetToAlpha(0.2)
+lootFadeOut:SetDuration(0.5)
+lootFadeOut:SetOrder(1)
+
+local lootFadeIn = lootPulse:CreateAnimation("Alpha")
+lootFadeIn:SetFromAlpha(0.2)
+lootFadeIn:SetToAlpha(1)
+lootFadeIn:SetDuration(0.5)
+lootFadeIn:SetOrder(2)
+
+lootPulse:SetLooping("REPEAT")
+lootRecordingWarning.pulse = lootPulse
+
+-- Store reference
+PSK.RecordingWarningDrops = lootRecordingWarning
+
+
+-- Clear loot drops button
+clearLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
+clearLootButton:SetPoint("RIGHT", lootHeader, "RIGHT", 55, 0)
+clearLootButton:SetSize(40, -20)
+clearLootButton:SetText("Clear")
 
 clearLootButton:SetScript("OnClick", function()
     StaticPopup_Show("PSK_CONFIRM_CLEAR_LOOT")
@@ -120,6 +149,8 @@ local bidScroll, bidChild, bidFrame, bidHeader =
     CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, -110, "Bids (" .. bidCount .. ")", 220)
 PSK.ScrollFrames.Bid = bidScroll
 PSK.ScrollChildren.Bid = bidChild
+bidHeader:ClearAllPoints()
+bidHeader:SetPoint("TOPLEFT", bidScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Bid = bidHeader
 
 -- Tabs
@@ -149,14 +180,35 @@ PSK.Tabs[3] = tab3
 
 local logScroll, logChild, logFrame, logHeader =
     CreateBorderedScrollFrame("PSKLogScrollFrame", PSK.LogsFrame, 20, -40, "Loot Logs", 645, 700)
--- logScroll:ClearAllPoints()
--- logScroll:SetPoint("TOPLEFT", PSK.LogsFrame, "TOPLEFT", 12, -40)
--- logScroll:SetPoint("BOTTOMRIGHT", PSK.LogsFrame, "BOTTOMRIGHT", -12, 12)
 PSK.ScrollFrames.Logs = logScroll
 PSK.ScrollChildren.Logs = logChild
 PSK.Headers.Logs = logHeader
 
+-- Flashing red "Loot is not being recorded!" warning
+local recordingWarning = PSK.LogsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+recordingWarning:SetPoint("LEFT", logHeader, "RIGHT", 10, 0)
+recordingWarning:SetText("Loot is not being recorded!")
+recordingWarning:SetTextColor(1, 0, 0)
+recordingWarning:Hide()
 
+-- Pulse animation
+local pulse = recordingWarning:CreateAnimationGroup()
+local fadeOut = pulse:CreateAnimation("Alpha")
+fadeOut:SetFromAlpha(1)
+fadeOut:SetToAlpha(0.2)
+fadeOut:SetDuration(0.5)
+fadeOut:SetOrder(1)
+
+local fadeIn = pulse:CreateAnimation("Alpha")
+fadeIn:SetFromAlpha(0.2)
+fadeIn:SetToAlpha(1)
+fadeIn:SetDuration(0.5)
+fadeIn:SetOrder(2)
+
+pulse:SetLooping("REPEAT")
+recordingWarning.pulse = pulse
+
+PSK.RecordingWarningLogs = recordingWarning
 
 -- Settings tab UI
 local settingsTitle = PSK.SettingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
@@ -229,6 +281,7 @@ PSK:RefreshBidList()
 C_Timer.After(0.1, function()
     if PSK.RefreshLogList then
         PSK:RefreshLogList()
+		PSK:RefreshLootList()
     end
 end)
 

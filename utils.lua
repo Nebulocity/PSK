@@ -6,6 +6,9 @@ PSK.ScrollChildren = PSK.ScrollChildren or {}
 PSK.Headers = PSK.Headers or {}
 PSK.ScrollFrames = PSK.ScrollFrames or {}
 
+local DEFAULT_COLUMN_WIDTH = 220
+local COLUMN_HEIGHT = 355
+
 
 -- Award selected player (move them to bottom, remove from bid list)
 function AwardPlayer(index)
@@ -105,8 +108,6 @@ function PerformAward(index)
 end
 
 
-
-
 -- Pass action (just clears selection)
 function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
@@ -132,11 +133,6 @@ function SaveGuildMembers()
     end
 end
 
--- Refresh Roster
-function RefreshRoster()
-    if not IsInGuild() then return end
-    GuildRoster()
-end
 
 function Announce(message)
 	if IsInRaid() then
@@ -147,16 +143,6 @@ function Announce(message)
 	end
 end
 
-local DEFAULT_COLUMN_WIDTH = 220
-
-local COLUMN_HEIGHT = 355
-
--- Helper to create bordered scroll frames with header
--- utils.lua
--- Helper to create bordered scroll frames with header
-
-local DEFAULT_COLUMN_WIDTH = 220
-local COLUMN_HEIGHT = 355
 
 function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
     local COLUMN_WIDTH = customWidth or 220
@@ -211,6 +197,30 @@ function PSK:RefreshLootList()
         child:SetParent(nil)
     end
 
+	if PSK.RecordingWarningDrops then
+		if not PSK.LootRecordingActive then
+			PSK.RecordingWarningDrops:Show()
+			if not PSK.RecordingWarningDrops.pulse:IsPlaying() then
+				PSK.RecordingWarningDrops.pulse:Play()
+			end
+		else
+			PSK.RecordingWarningDrops:Hide()
+			PSK.RecordingWarningDrops.pulse:Stop()
+		end
+	end
+
+	if PSK.RecordingWarningLogs then
+		if not PSK.LootRecordingActive then
+			PSK.RecordingWarningLogs:Show()
+			if not PSK.RecordingWarningLogs.pulse:IsPlaying() then
+				PSK.RecordingWarningLogs.pulse:Play()
+			end
+		else
+			PSK.RecordingWarningLogs:Hide()
+			PSK.RecordingWarningLogs.pulse:Stop()
+		end
+	end
+	
     local yOffset = -5
     for index, loot in ipairs(PSK.LootDrops) do
         local row = CreateFrame("Button", nil, scrollChild)
@@ -290,6 +300,19 @@ function PSK:RefreshLogList()
 
     local scrollChild = PSK.ScrollChildren.Logs
     local header = PSK.Headers.Logs
+	
+	if PSK.RecordingWarning then
+		if not PSK.LootRecordingActive then
+			PSK.RecordingWarning:Show()
+			if not PSK.RecordingWarning.pulse:IsPlaying() then
+				PSK.RecordingWarning.pulse:Play()
+			end
+		else
+			PSK.RecordingWarning:Hide()
+			PSK.RecordingWarning.pulse:Stop()
+		end
+	end
+
     if not scrollChild or not header then return end
 
     -- Clear previous children
@@ -306,17 +329,28 @@ function PSK:RefreshLogList()
         row:SetSize(650, 20)
         row:SetPoint("TOPLEFT", 0, yOffset)
 
-        -- Class icon (optional; skip if not using for now)
-        --[[
-        local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(16, 16)
-        icon:SetPoint("LEFT", row, "LEFT", 5, 0)
-        PSK:SetClassIcon(icon, log.class)
-        ]]
+        -- Class icon
+		local classIcon = row:CreateTexture(nil, "ARTWORK")
+		classIcon:SetSize(16, 16)
+		classIcon:SetPoint("LEFT", row, "LEFT", 5, 0)
+
+		if log.class then
+			local class = log.class:upper()
+			local texCoord = CLASS_ICON_TCOORDS[class]
+			if texCoord then
+				classIcon:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CharacterCreate-Classes")
+				classIcon:SetTexCoord(unpack(texCoord))
+			else
+				classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			end
+		else
+			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+		end
+
 
         -- Player Name
         local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        playerText:SetPoint("LEFT", row, "LEFT", 5, 0)
+        playerText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
         playerText:SetText(log.player)
 
 		-- Get the item texture if it wasn't recorded earlier.
@@ -335,21 +369,26 @@ function PSK:RefreshLogList()
 		-- Item link
 		local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		itemText:SetPoint("LEFT", iconTexture, "RIGHT", 6, 0)
-		itemText:SetText(log.itemLink)
+		
+		local itemName, _, itemRarity = GetItemInfo(log.itemLink)
+		local r, g, b = 1, 1, 1 -- fallback white
+
+		if itemRarity then
+			r, g, b = GetItemQualityColor(itemRarity)
+		end
+
+		itemText:SetText(itemName or log.itemLink)
+		itemText:SetTextColor(r, g, b)
+
 		itemText:SetScript("OnEnter", function()
 			GameTooltip:SetOwner(itemText, "ANCHOR_RIGHT")
 			GameTooltip:SetHyperlink(log.itemLink)
 			GameTooltip:Show()
 		end)
-		itemText:SetScript("OnLeave", function()
-			GameTooltip:Hide()
-		end)
-
 
 		itemText:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
-
 
         -- Timestamp
         local timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -361,7 +400,7 @@ function PSK:RefreshLogList()
 
     -- Optional header update
     if header then
-        header:SetText("Loot Log (" .. #PSKDB.LootLogs .. ")")
+        header:SetText("Loot Logs (" .. #PSKDB.LootLogs .. ")")
     end
 end
 
