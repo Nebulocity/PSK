@@ -2,12 +2,14 @@
 
 local PSK = select(2, ...)
 PSK.LootDrops = PSK.LootDrops or {}
+PSK.LootLog = PSK.LootDrops or {}
 
 -- For Tracking
+PSKDB = PSKDB or {}             
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
 if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
-
+if not PSKDB.LootDrops then PSKDB.LootDrops = {} end
 
 
 local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
@@ -104,11 +106,14 @@ lootFrame:SetScript("OnEvent", function(self, event, msg)
 
 
                     table.insert(PSKDB.LootLogs, {
-                        player = player,
-                        class = class,
-                        itemLink = itemLink,
-                        timestamp = date("%Y-%m-%d %H:%M:%S")
-                    })
+						player = player,
+						class = class,
+						itemLink = itemLink,
+						itemTexture = icon, 
+						timestamp = date("%I:%M%p %m/%d/%Y")
+					})
+
+
 
                     if PSK.RefreshLogList then
                         PSK:RefreshLogList()
