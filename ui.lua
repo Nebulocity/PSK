@@ -88,6 +88,26 @@ PSK.LogsFrame:Hide()
 
 PSK.CurrentList = "Main"
 
+---------------------------------------------
+-- Add Player Frame
+---------------------------------------------
+
+PSK.AddSection = CreateFrame("Frame", nil, PSK.ContentFrame)
+PSK.AddSection:SetSize(220, 80)
+PSK.AddSection:SetPoint("TOPLEFT", PSK.ScrollFrames.Main, "BOTTOMLEFT", 0, -20)
+
+-- Title
+local addLabel = addSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+addLabel:SetPoint("TOPLEFT", 5, -5)
+addLabel:SetText("Add Player to List")
+
+-- Input Box
+local nameInput = CreateFrame("EditBox", nil, PSK.AddSection, "InputBoxTemplate")
+nameInput:SetSize(140, 20)
+nameInput:SetPoint("TOPLEFT", addLabel, "BOTTOMLEFT", 0, -5)
+nameInput:SetAutoFocus(false)
+nameInput:SetText("")
+
 ----------------------------------------------
 -- Parent Player scroll frame to ContentFrame
 ----------------------------------------------
@@ -99,6 +119,53 @@ PSK.ScrollChildren.Main = guildChild
 guildHeader:ClearAllPoints()
 guildHeader:SetPoint("TOPLEFT", guildScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Main = guildHeader
+
+----------------------------------------------
+-- Dropdown List for adding a player
+----------------------------------------------
+
+local listDropdown = CreateFrame("Frame", "PSKListDropdown", PSK.AddSection, "UIDropDownMenuTemplate")
+listDropdown:SetPoint("TOPLEFT", nameInput, "BOTTOMLEFT", -15, -5)
+
+local listOptions = { "Main", "Tier" }
+local selectedList = "Main"
+UIDropDownMenu_SetWidth(listDropdown, 90)
+UIDropDownMenu_Initialize(listDropdown, function(self, level)
+ for _, listName in ipairs(listOptions) do
+  local info = UIDropDownMenu_CreateInfo()
+  info.text = listName
+  info.func = function()
+   selectedList = listName
+   UIDropDownMenu_SetText(listDropdown, listName)
+  end
+  UIDropDownMenu_AddButton(info, level)
+ end
+end)
+UIDropDownMenu_SetText(listDropdown, "Main")
+
+
+--------------------------------------------------
+-- Dropdown List for setting player to top/bottom
+--------------------------------------------------
+
+local positionDropdown = CreateFrame("Frame", "PSKPositionDropdown", PSK.AddSection, "UIDropDownMenuTemplate")
+positionDropdown:SetPoint("LEFT", listDropdown, "RIGHT", -10, 0)
+
+local positionOptions = { "Top", "Bottom" }
+local selectedPosition = "Bottom"
+UIDropDownMenu_SetWidth(positionDropdown, 90)
+UIDropDownMenu_Initialize(positionDropdown, function(self, level)
+ for _, pos in ipairs(positionOptions) do
+  local info = UIDropDownMenu_CreateInfo()
+  info.text = pos
+  info.func = function()
+   PSK.SelectedPosition = pos
+   UIDropDownMenu_SetText(positionDropdown, pos)
+  end
+  UIDropDownMenu_AddButton(info, level)
+ end
+end)
+UIDropDownMenu_SetText(positionDropdown, "Bottom")
 
 
 ----------------------------------------------
