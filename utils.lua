@@ -141,7 +141,7 @@ function PerformAward(index)
     end
 
     Announce("[PSK] Awarded loot to " .. playerName .. "!")
-    PSK:RefreshGuildList()
+    PSK:RefreshPlayerList()
     PSK:RefreshBidList()
     PlaySound(12867)
 end
@@ -468,7 +468,7 @@ end
 -- Refresh Player List (for Main or Tier)
 ----------------------------------------
 
-function PSK:RefreshGuildList()
+function PSK:RefreshPlayerList()
     if not PSKDB or not PSK.CurrentList then return end
 
     local scrollChild = PSK.ScrollChildren.Main
@@ -587,7 +587,44 @@ function PSK:RefreshGuildList()
         end)
         row:SetScript("OnLeave", GameTooltip_Hide)
 
-        yOffset = yOffset - 22
+	-- If selected row, attach up/down buttons
+	if PSK.SelectedPlayerRow == index then
+	    -- Up Button
+	    local upButton = CreateFrame("Button", nil, row)
+	    upButton:SetSize(16, 16)
+	    upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
+	    upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+	    upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+	    upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+	    upButton:SetScript("OnClick", function()
+	        if index > 1 then
+	            table.insert(names, index - 1, table.remove(names, index))
+	            PSK:RefreshPlayerList()
+	        end
+	    end)
+	
+	    -- Down Button
+	    local downButton = CreateFrame("Button", nil, row)
+	    downButton:SetSize(16, 16)
+	    downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+	    downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+	    downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+	    downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+	    downButton:SetScript("OnClick", function()
+	        if index < #names then
+	            table.insert(names, index + 1, table.remove(names, index))
+	            PSK:RefreshPlayerList()
+	        end
+	    end)
+	end
+
+	-- Make name text clickable so it can be selected
+	row:SetScript("OnClick", function()
+		PSK:SelectedPlayerRow = index
+		PSK:RefreshPlayerList()
+	end)
+        
+	yOffset = yOffset - 22
     end
 end
 
