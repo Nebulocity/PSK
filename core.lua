@@ -168,39 +168,36 @@ end)
 -- Update Guild Data (live)
 ----------------------------------------
 
-function UpdateGuildData()
-    if not IsInGuild() then return end
-
-    GuildRoster()
-
-    if not PSKDB.Players then
-        PSKDB.Players = {}
-    end
-
-    for i = 1, GetNumGuildMembers() do
-        local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetGuildRosterInfo(i)
-
-        if name then
-            name = Ambiguate(name, "none") -- Remove realm name if needed
-            if not PSKDB.Players[name] then
-                PSKDB.Players[name] = {}
-            end
-
-            PSKDB.Players[name].class = classFileName
-            PSKDB.Players[name].online = online
-            PSKDB.Players[name].inRaid = UnitInRaid(name) ~= nil
-			PSKDB.Players[name].level = level
-			PSKDB.Players[name].zone = zone
-        end
-    end
-
+-- function UpdateGuildData()
+--     if not IsInGuild() then return end
+-- 
+--     GuildRoster()
+-- 
+--     if not PSKDB.Players then
+--         PSKDB.Players = {}
+--     end
+-- 
+--     for i = 1, GetNumGuildMembers() do
+--         local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetGuildRosterInfo(i)
+-- 
+--         if name then
+--             name = Ambiguate(name, "none") -- Remove realm name if needed
+--             if not PSKDB.Players[name] then
+--                 PSKDB.Players[name] = {}
+--             end
+-- 
+--             PSKDB.Players[name].class = classFileName
+--             PSKDB.Players[name].online = online
+--             PSKDB.Players[name].inRaid = UnitInRaid(name) ~= nil
+-- 			PSKDB.Players[name].level = level
+-- 			PSKDB.Players[name].zone = zone
+--         end
+--     end
+-- 
     -- Refresh displays
-    PSK:RefreshGuildList()
-    PSK:RefreshBidList()
-end
-
--- The rest of the file remains unchanged
-
+--     PSK:RefreshGuildList()
+--     PSK:RefreshBidList()
+--  end
 
 ----------------------------------------
 -- Bidding System 
@@ -306,6 +303,10 @@ function PSK:CloseBidding()
 end
 
 
+------------------------------------------
+-- Scan these channels for the word "bid"
+------------------------------------------
+
 local chatFrame = CreateFrame("Frame")
 chatFrame:RegisterEvent("CHAT_MSG_RAID")
 chatFrame:RegisterEvent("CHAT_MSG_RAID_WARNING")
@@ -330,6 +331,10 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
         RetractBid(simpleName)
     end
 end)
+
+------------------------------------------
+-- Add a bid
+------------------------------------------
 
 function AddBid(name)
     if not name then return end
@@ -365,6 +370,10 @@ function AddBid(name)
     end
 end
 
+------------------------------------------
+-- Scan these channels for the word "retract"
+------------------------------------------
+
 function RetractBid(name)
     if not name then return end
 
@@ -378,7 +387,10 @@ function RetractBid(name)
 end
 
 
--- Register slash command AFTER player login
+------------------------------------------
+-- Console commands to open addon
+------------------------------------------
+
 local slashFrame = CreateFrame("Frame")
 slashFrame:RegisterEvent("PLAYER_LOGIN")
 
@@ -409,6 +421,10 @@ slashFrame:SetScript("OnEvent", function()
 
 end)
 
+------------------------------------------
+-- Console command to export lists
+------------------------------------------
+
 SLASH_PSKEXPORT1 = "/pskexport"
 SlashCmdList["PSKEXPORT"] = function(msg)
     msg = msg and msg:lower():gsub("^%s+", "") or ""
@@ -434,9 +450,9 @@ function PSK:ExportList(listType)
     PSK:ShowExportWindow(exportLine)
 end
 
-
-
-
+------------------------------------------
+-- Console command to print command help
+------------------------------------------
 
 function PSK:PrintHelp()
     print(" ")
@@ -452,7 +468,9 @@ function PSK:PrintHelp()
     print(" ")
 end
 
-
+------------------------------------------------
+-- Print the currently selected list to console
+------------------------------------------------
 
 function PSK:PrintCurrentList()
     local listType = PSK.CurrentList or "Main"
@@ -484,8 +502,11 @@ function PSK:PrintCurrentList()
 end
 
 
+------------------------------------------
+-- Console command to add a player
+-- /pskadd <top|bottom> <main|tier> <name>
+------------------------------------------
 
--- Slash command: /pskadd <top|bottom> <main|tier> <name>
 SLASH_PSKADD1 = "/pskadd"
 SlashCmdList["PSKADD"] = function(msg)
     -- Hooray for REGEX!  lol
@@ -512,7 +533,10 @@ SlashCmdList["PSKADD"] = function(msg)
     PSK:AddPlayerFromCommand(name, listType, position)
 end
 
--- Removes a player's name from the currently viewed list.
+-----------------------------------------------------------------
+-- Console command to remove a player from main/tier/both lists
+-----------------------------------------------------------------
+
 SLASH_PSKREMOVE1 = "/pskremove"
 SlashCmdList["PSKREMOVE"] = function(msg)
     local scope, name
@@ -564,11 +588,17 @@ function PSK:RemovePlayerByScope(scope, rawName)
     PSK:RefreshGuildList()
 end
 
-
+------------------------------------------------
+-- Capitalize names that get added to the lists
+------------------------------------------------
 
 local function CapitalizeName(name)
     return name:sub(1, 1):upper() .. name:sub(2):lower()
 end
+
+------------------------------------------
+-- Function add player from slash command
+------------------------------------------
 
 function PSK:AddPlayerFromCommand(name, listType, position)
     -- Normalize and clean input
