@@ -31,10 +31,46 @@ PSK.ToggleListButton:SetScript("OnClick", function()
 		PSK:PlayRandomPeonSound()
 	end
 
-    PSK:RefreshGuildList()
+    PSK:RefreshPlayerList()
     PSK:RefreshBidList()
 end)
 
+
+-------------------------------------------
+-- Button to add players to Main/Tier list
+-------------------------------------------
+
+PSK.AddPlayerButton = CreateFrame("Button", nil, PSK.AddSection, "GameMenuButtonTemplate")
+PSK.AddPlayerButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 55, 0)
+PSK.AddPlayerButton:SetSize(40, -20)
+PSK.AddPlayerButton:SetText("Clear")
+
+PSK.AddPlayerButton:SetScript("OnClick", function()
+ local playerName = strtrim(nameInput:GetText() or "")
+ if playerName == "" then
+  print("|cffff4444[PSK]|r Please enter a player name.")
+  return
+ end
+
+ local list = (selectedList == "Main") and PSKDB.MainList or PSKDB.TierList
+ for _, existing in ipairs(list) do
+  if existing:lower() == playerName:lower() then
+   print("|cffff4444[PSK]|r Player already exists in " .. selectedList .. " list.")
+   return
+  end
+ end
+
+ if SelectedPosition == "Top" then
+  table.insert(list, 1, playerName)
+ else
+  table.insert(list, playerName)
+ end
+
+ print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. selectedList .. " list (" .. selectedPosition .. ").")
+ nameInput:SetText("")
+
+ PSK:RefreshPlayerList()
+end)
 
 ------------------------------
 -- Button to record loot drops
