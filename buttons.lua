@@ -1,7 +1,11 @@
 local PSK = select(2, ...)
 _G.PSKGlobal = PSK
 
--- Switch Main/Tier List Button
+
+---------------------------------
+-- Switch between Main/Tier List
+---------------------------------
+
 PSK.ToggleListButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
 PSK.ToggleListButton:SetSize(140, 30)
 PSK.ToggleListButton:SetText("Switch to Tier List")
@@ -32,7 +36,10 @@ PSK.ToggleListButton:SetScript("OnClick", function()
 end)
 
 
--- Record Loot Button
+------------------------------
+-- Button to record loot drops
+------------------------------
+
 PSK.RecordLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
 PSK.RecordLootButton:SetSize(140, 30)
 PSK.RecordLootButton:SetText("Record Loot")
@@ -67,8 +74,35 @@ PSK.RecordLootButton:SetScript("OnClick", function(self)
 end)
 
 
+------------------------------
+-- Button to clear loot drops
+------------------------------
 
--- Toggle Bidding Button (Start <-> Close)
+PSK.ClearLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
+PSK.ClearLootButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 55, 0)
+PSK.ClearLootButton:SetSize(40, -20)
+PSK.ClearLootButton:SetText("Clear")
+
+PSK.ClearLootButton:SetScript("OnClick", function()
+    StaticPopup_Show("PSK_CONFIRM_CLEAR_LOOT")
+end)
+
+PSK.ClearLootButton:SetMotionScriptsWhileDisabled(true)
+PSK.ClearLootButton:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(PSK.ClearLootButton, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Clear Loot List", 1, 1, 1)
+    GameTooltip:AddLine("This will delete all tracked loot.", nil, nil, nil, true)
+    GameTooltip:Show()
+end)
+
+PSK.ClearLootButton:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+
+------------------------------
+-- Button to start bidding
+------------------------------
+
 PSK.BidButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
 PSK.BidButton:SetSize(140, 30)
 PSK.BidButton:SetText("Start Bidding")
@@ -88,7 +122,10 @@ PSK.BidButton:SetScript("OnClick", function(self)
     end
 end)
 
--- Create a Glow Border Frame
+------------------------------
+-- Active bidding glow
+------------------------------
+
 PSK.BidButton.Border = CreateFrame("Frame", nil, PSK.BidButton, "BackdropTemplate")
 PSK.BidButton.Border:SetAllPoints()
 PSK.BidButton.Border:SetFrameLevel(PSK.BidButton:GetFrameLevel() + 1)
@@ -102,7 +139,9 @@ PSK.BidButton.Border:SetBackdropBorderColor(0, 1, 0, 1) -- Bright green
 PSK.BidButton.Border:Hide() -- Hidden initially
 
 
--- Pulse Animation for the Border
+------------------------------
+-- Active bidding pulse
+------------------------------
 local pulse = PSK.BidButton.Border:CreateAnimationGroup()
 
 local fadeOut = pulse:CreateAnimation("Alpha")
@@ -119,7 +158,6 @@ fadeIn:SetOrder(2)
 
 pulse:SetLooping("REPEAT")
 
--- Save the animation
 PSK.BidButton.Border.Pulse = pulse
 
 PSK.BidButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", 10, 0)
@@ -130,6 +168,9 @@ if not BiddingOpen then
     PSK.BidButton:Disable()
 end
 
+-----------------------------------------
+-- Set script on button, bidding effects
+-----------------------------------------
 
 PSK.BidButton:SetScript("OnClick", function()
 	if BiddingOpen then
@@ -154,7 +195,10 @@ PSK.BidButton:SetScript("OnClick", function()
 end)
 
 
--- Center the three top buttons horizontally
+---------------------------------------------
+-- Center buttons at top of PSK.ContentFrame
+---------------------------------------------
+
 local spacing = 20
 local buttonWidth = 140
 
@@ -165,8 +209,7 @@ PSK.BidButton:SetWidth(buttonWidth)
 local totalWidth = buttonWidth * 3 + spacing * 2
 local startX = -totalWidth / 2 + buttonWidth / 2
 
-
--- Clear and SetPoints go down here too
+-- Reset default positioning
 PSK.ToggleListButton:ClearAllPoints()
 PSK.RecordLootButton:ClearAllPoints()
 PSK.BidButton:ClearAllPoints()
@@ -174,8 +217,6 @@ PSK.BidButton:ClearAllPoints()
 PSK.ToggleListButton:SetPoint("TOP", PSK.ContentFrame, "TOP", startX, -40)
 PSK.RecordLootButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", spacing, 0)
 PSK.BidButton:SetPoint("LEFT", PSK.RecordLootButton, "RIGHT", spacing, 0)
-
-
 
 if PSK.FinalizeUI then
     PSK:FinalizeUI()
