@@ -1,6 +1,12 @@
--- utils.lua
--- Helper functions for PSK
+---------------------------------------------------
+-- This file is for helper functions for the addon
+---------------------------------------------------
+
 local PSK = select(2, ...)
+
+---------------------------------------------------
+-- Set/Get important details we'll need below
+---------------------------------------------------
 
 PSK.ScrollChildren = PSK.ScrollChildren or {}
 PSK.Headers = PSK.Headers or {}
@@ -10,7 +16,10 @@ local DEFAULT_COLUMN_WIDTH = 220
 local COLUMN_HEIGHT = 355
 
 
--- Award selected player (move them to bottom, remove from bid list)
+---------------------------------
+-- Award loot to selected player
+---------------------------------
+
 function AwardPlayer(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
@@ -36,6 +45,11 @@ function AwardPlayer(index)
 
     StaticPopup_Show("PSK_CONFIRM_AWARD", playerName)
 end
+
+
+---------------------------------
+-- Perform the award
+---------------------------------
 
 function PerformAward(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
@@ -80,7 +94,7 @@ function PerformAward(index)
         PSK:RefreshLootList()
     end
 
-    -- Remove from bidsbids
+    -- Remove from bids
     table.remove(PSK.BidEntries, index)
 
     -- Move awarded player to end of list
@@ -133,32 +147,41 @@ function PerformAward(index)
 end
 
 
+---------------------------------
+-- Pass on current player
+---------------------------------
 
--- Pass action (just clears selection)
 function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
 end
 
--- SaveGuildMembers: save level 60s
-function SaveGuildMembers()
-    if not IsInGuild() then return end
-    wipe(PSKDB)
+----------------------------------------------
+-- Gets guild member info if they're level 60
+----------------------------------------------
 
-    local total = GetNumGuildMembers()
-    for i = 1, total do
-        local name, _, _, level, classFileName, _, _, _, online = GetGuildRosterInfo(i)
-        if name and level == 60 then
-            name = Ambiguate(name, "short")
-            local token = classFileName and string.upper(classFileName) or "UNKNOWN"
-            PSKDB[name] = {
-                class  = token,
-                online = online,
-                seen   = date("%Y-%m-%d %H:%M"),
-            }
-        end
-    end
-end
+-- function SaveGuildMembers()
+--     if not IsInGuild() then return end
+--     wipe(PSKDB)
+-- 
+--     local total = GetNumGuildMembers()
+--     for i = 1, total do
+--         local name, _, _, level, classFileName, _, _, _, online = GetGuildRosterInfo(i)
+--         if name and level == 60 then
+--             name = Ambiguate(name, "short")
+--             local token = classFileName and string.upper(classFileName) or "UNKNOWN"
+--             PSKDB[name] = {
+--                 class  = token,
+--                 online = online,
+--                 seen   = date("%Y-%m-%d %H:%M"),
+--             }
+--         end
+--     end
+-- end
 
+
+----------------------------------------------
+-- Announce to party/raid 
+----------------------------------------------
 
 function Announce(message)
 	if IsInRaid() then
@@ -171,6 +194,9 @@ function Announce(message)
 end
 
 
+----------------------------------------------
+-- I CAN'T REMEMBER WHAT THIS FRAME IS FOR?
+----------------------------------------------
 
 function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
     local COLUMN_WIDTH = customWidth or 220
@@ -324,6 +350,9 @@ function PSK:RefreshLootList()
 end
 
 
+----------------------------------------
+-- Refresh Log list
+----------------------------------------
 
 function PSK:RefreshLogList()
     if not PSKDB.LootLogs then return end
@@ -436,7 +465,7 @@ end
 
 
 ----------------------------------------
--- Refresh Guild List (for Main or Tier)
+-- Refresh Player List (for Main or Tier)
 ----------------------------------------
 
 function PSK:RefreshGuildList()
