@@ -41,36 +41,42 @@ end)
 -------------------------------------------
 
 PSK.AddPlayerButton = CreateFrame("Button", nil, PSK.AddSection, "GameMenuButtonTemplate")
-PSK.AddPlayerButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 55, 0)
-PSK.AddPlayerButton:SetSize(40, -20)
-PSK.AddPlayerButton:SetText("Clear")
+PSK.AddPlayerButton:SetPoint("RIGHT", PSK.Headers.Main, "RIGHT", -15, 30)
+PSK.AddPlayerButton:SetSize(80, -25)
+PSK.AddPlayerButton:SetText("Add Player")
 
 PSK.AddPlayerButton:SetScript("OnClick", function()
- local playerName = strtrim(nameInput:GetText() or "")
- if playerName == "" then
-  print("|cffff4444[PSK]|r Please enter a player name.")
-  return
- end
+    local playerName = strtrim(PSK.NameInput:GetText() or "")
+    
+    if playerName == "" then
+        print("|cffff4444[PSK]|r Please enter a player name.")
+        return
+    end
 
- local list = (selectedList == "Main") and PSKDB.MainList or PSKDB.TierList
- for _, existing in ipairs(list) do
-  if existing:lower() == playerName:lower() then
-   print("|cffff4444[PSK]|r Player already exists in " .. selectedList .. " list.")
-   return
-  end
- end
+    local list = (PSK.SelectedList == "Main") and PSKDB.MainList or PSKDB.TierList
 
- if SelectedPosition == "Top" then
-  table.insert(list, 1, playerName)
- else
-  table.insert(list, playerName)
- end
+    for _, existing in ipairs(list) do
+        if existing:lower() == playerName:lower() then
+            print("|cffff4444[PSK]|r Player already exists in " .. PSK.SelectedList .. " list.")
+            return
+        end
+    end
 
- print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. selectedList .. " list (" .. selectedPosition .. ").")
- nameInput:SetText("")
+    if PSK.SelectedPosition == "Top" then
+        table.insert(list, 1, playerName)
+    else
+        table.insert(list, playerName)
+    end
 
- PSK:RefreshPlayerList()
+    print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. PSK.SelectedList .. " list (" .. (PSK.SelectedPosition or "Bottom") .. ").")
+    
+    -- Clear the input box
+    PSK.NameInput:SetText("")
+
+    -- Refresh display
+    PSK:RefreshPlayerList()
 end)
+
 
 ------------------------------
 -- Button to record loot drops
@@ -115,8 +121,8 @@ end)
 ------------------------------
 
 PSK.ClearLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
-PSK.ClearLootButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 55, 0)
-PSK.ClearLootButton:SetSize(40, -20)
+PSK.ClearLootButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 145, 0)
+PSK.ClearLootButton:SetSize(60, -20)
 PSK.ClearLootButton:SetText("Clear")
 
 PSK.ClearLootButton:SetScript("OnClick", function()
@@ -134,6 +140,20 @@ end)
 PSK.ClearLootButton:SetScript("OnLeave", function()
     GameTooltip:Hide()
 end)
+
+
+------------------------------
+-- Display Rarity
+------------------------------
+
+PSK.LootLabel = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+PSK.LootLabel:SetPoint("RIGHT", PSK.ClearLootButton, "LEFT", -5, -1)
+local threshold = PSK.Settings.lootThreshold or 3
+local color =  PSK.RarityColors[threshold] or "ffffff"
+local name = PSK.RarityNames[threshold] or "Rare"
+
+PSK.LootLabel:SetText("|cff" .. color .. "(" .. name .. "0" .. "+|r")
+
 
 ------------------------------
 -- Button to start bidding

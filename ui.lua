@@ -9,7 +9,7 @@ if not PSKDB then PSKDB = {} end
 PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 1 } -- change to 3 for rare
 PSK.Settings = CopyTable(PSKDB.Settings)
 local mainListCount = #PSKDB.MainList or 0
-
+local scrollFrameHeight = -150
 ------------------------
 -- Initialize containers
 ------------------------
@@ -92,56 +92,56 @@ PSK.CurrentList = "Main"
 -- Add Player Frame
 ---------------------------------------------
 
-PSK.AddSection = CreateFrame("Frame", nil, PSK.ContentFrame)
-PSK.AddSection:SetSize(220, 80)
-PSK.AddSection:SetPoint("TOPLEFT", PSK.ScrollFrames.Main, "BOTTOMLEFT", 0, -20)
+-- Input Box next to Add Player button
+-- PSK.NameInput = CreateFrame("EditBox", nil, PSK.AddSection, "InputBoxTemplate")
+-- PSK.NameInput:SetSize(120, 20)
+-- PSK.NameInput:SetPoint("LEFT", PSK.AddPlayerButton, "RIGHT", 10, 0)
+-- PSK.NameInput:SetAutoFocus(false)
+-- PSK.NameInput:SetText("Enter Name")
 
--- Title
-local addLabel = addSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-addLabel:SetPoint("TOPLEFT", 5, -5)
-addLabel:SetText("Add Player to List")
 
--- Input Box
-local nameInput = CreateFrame("EditBox", nil, PSK.AddSection, "InputBoxTemplate")
-nameInput:SetSize(140, 20)
-nameInput:SetPoint("TOPLEFT", addLabel, "BOTTOMLEFT", 0, -5)
-nameInput:SetAutoFocus(false)
-nameInput:SetText("")
+
+
+
+
 
 ----------------------------------------------
 -- Parent Player scroll frame to ContentFrame
 ----------------------------------------------
 
-local guildScroll, guildChild, guildFrame, guildHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, -110, "PSK Main (" .. mainListCount .. ")")
-PSK.ScrollFrames.Main = guildScroll
-PSK.ScrollChildren.Main = guildChild
-guildHeader:ClearAllPoints()
-guildHeader:SetPoint("TOPLEFT", guildScroll, "TOPLEFT", 0, 20)
-PSK.Headers.Main = guildHeader
+local playerScroll, playerChild, playerFrame, playerHeader =
+    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, scrollFrameHeight, "PSK Main (" .. mainListCount .. ")")
+PSK.ScrollFrames.Main = playerScroll
+PSK.ScrollChildren.Main = playerChild
+playerHeader:ClearAllPoints()
+playerHeader:SetPoint("TOPLEFT", playerScroll, "TOPLEFT", 0, 20)
+PSK.Headers.Main = playerHeader
 
 ----------------------------------------------
 -- Dropdown List for adding a player
 ----------------------------------------------
 
+-- Dropdown to choose which list to add to
 local listDropdown = CreateFrame("Frame", "PSKListDropdown", PSK.AddSection, "UIDropDownMenuTemplate")
-listDropdown:SetPoint("TOPLEFT", nameInput, "BOTTOMLEFT", -15, -5)
+listDropdown:SetPoint("TOPLEFT", PSK.NameInput, "BOTTOMLEFT", -15, -5)
 
 local listOptions = { "Main", "Tier" }
-local selectedList = "Main"
+PSK.SelectedList = "Main" -- default
 UIDropDownMenu_SetWidth(listDropdown, 90)
 UIDropDownMenu_Initialize(listDropdown, function(self, level)
- for _, listName in ipairs(listOptions) do
-  local info = UIDropDownMenu_CreateInfo()
-  info.text = listName
-  info.func = function()
-   selectedList = listName
-   UIDropDownMenu_SetText(listDropdown, listName)
-  end
-  UIDropDownMenu_AddButton(info, level)
- end
+    for _, listName in ipairs(listOptions) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = listName
+        info.func = function()
+            PSK.SelectedList = listName
+            UIDropDownMenu_SetText(listDropdown, listName)
+        end
+        UIDropDownMenu_AddButton(info, level)
+    end
 end)
 UIDropDownMenu_SetText(listDropdown, "Main")
+
+
 
 
 --------------------------------------------------
@@ -173,7 +173,7 @@ UIDropDownMenu_SetText(positionDropdown, "Bottom")
 ----------------------------------------------
 
 local lootScroll, lootChild, lootFrame, lootHeader =
-    CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, -110, "Loot Drops (0)")
+    CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, scrollFrameHeight, "Loot Drops")
 PSK.ScrollFrames.Loot = lootScroll
 PSK.ScrollChildren.Loot = lootChild
 lootHeader:ClearAllPoints()
@@ -202,7 +202,7 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
 
 local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
 local bidScroll, bidChild, bidFrame, bidHeader =
-    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, -110, "Bids (" .. bidCount .. ")", 220)
+    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, scrollFrameHeight, "Bids (" .. bidCount .. ")", 220)
 PSK.ScrollFrames.Bid = bidScroll
 PSK.ScrollChildren.Bid = bidChild
 bidHeader:ClearAllPoints()
@@ -291,7 +291,7 @@ PSK.RecordingWarningLogs = recordingWarning
 ------------------------------
 
 local threshold = PSK.Settings and PSK.Settings.lootThreshold or 3
-local rarityNames = {
+ PSK.RarityNames = {
     [0] = "Poor",
     [1] = "Common",
     [2] = "Uncommon",
@@ -300,14 +300,24 @@ local rarityNames = {
     [5] = "Legendary"
 }
 
+ PSK.RarityColors = {
+    [0] = "9d9d9d", -- Poor
+    [1] = "ffffff", -- Common
+    [2] = "1eff00", -- Uncommon
+    [3] = "0070dd", -- Rare
+    [4] = "a335ee", -- Epic
+    [5] = "ff8000", -- Legendary
+}
+
 ------------------------------
 -- Set Loot Threshold Header
 ------------------------------
 
-local rarityName = rarityNames[threshold] or "?"
+local rarityName = PSK.RarityNames[threshold] or "?"
 local upArrow = "|TInterface\\AddOns\\PSK\\media\\arrow_up.tga:24:24|t"
 local dropCount = #PSK.LootDrops
-lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
+lootHeader:SetText("Loot Drops")
+-- lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
 
 
 ------------------------------
@@ -414,7 +424,7 @@ PSK.SettingsFrame:Hide()
 -- Refresh lists on load
 ----------------------------------
 
-PSK:RefreshGuildList()
+PSK:RefreshPlayerList()
 PSK:RefreshBidList()
 
 -- Timed refresh to ensure logs/loot lists are ready on player login
@@ -422,6 +432,7 @@ C_Timer.After(0.1, function()
     if PSK.RefreshLogList then
         PSK:RefreshLogList()
 		PSK:RefreshLootList()
+		PSK:UpdateLootThresholdLabel()
     end
 end)
 

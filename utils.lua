@@ -156,16 +156,16 @@ function PassPlayer()
 end
 
 ----------------------------------------------
--- Gets guild member info if they're level 60
+-- Gets player member info if they're level 60
 ----------------------------------------------
 
--- function SaveGuildMembers()
---     if not IsInGuild() then return end
+-- function SavePlayerMembers()
+--     if not IsInPlayer() then return end
 --     wipe(PSKDB)
 -- 
---     local total = GetNumGuildMembers()
+--     local total = GetNumPlayerMembers()
 --     for i = 1, total do
---         local name, _, _, level, classFileName, _, _, _, online = GetGuildRosterInfo(i)
+--         local name, _, _, level, classFileName, _, _, _, online = GetPlayerRosterInfo(i)
 --         if name and level == 60 then
 --             name = Ambiguate(name, "short")
 --             local token = classFileName and string.upper(classFileName) or "UNKNOWN"
@@ -346,7 +346,8 @@ function PSK:RefreshLootList()
         [3] = "Rare", [4] = "Epic", [5] = "Legendary"
     }
     local rarityName = rarityNames[threshold] or "?"
-    header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
+    -- header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
+	header:SetText("Loot Drops")
 end
 
 
@@ -469,7 +470,7 @@ end
 ----------------------------------------
 
 function PSK:RefreshPlayerList()
-    if not PSKDB or not PSK.CurrentList then return end
+   if not PSKDB or not PSK.CurrentList then return end
 
     local scrollChild = PSK.ScrollChildren.Main
     local header = PSK.Headers.Main
@@ -494,7 +495,6 @@ function PSK:RefreshPlayerList()
     local yOffset = -5
     for index, name in ipairs(names) do
         local row = CreateFrame("Button", nil, scrollChild)
-
         row:SetSize(200, 20)
         row:SetPoint("TOPLEFT", 0, yOffset)
 
@@ -539,6 +539,12 @@ function PSK:RefreshPlayerList()
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
         nameText:SetText(name)
+
+        -- Click to select row
+        row:SetScript("OnClick", function()
+            PSK.SelectedPlayerRow = index
+            PSK:RefreshPlayerList()
+        end)
 
         -- Status
         local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -587,46 +593,58 @@ function PSK:RefreshPlayerList()
         end)
         row:SetScript("OnLeave", GameTooltip_Hide)
 
-	-- If selected row, attach up/down buttons
-	if PSK.SelectedPlayerRow == index then
-	    -- Up Button
-	    local upButton = CreateFrame("Button", nil, row)
-	    upButton:SetSize(16, 16)
-	    upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
-	    upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-	    upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
-	    upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
-	    upButton:SetScript("OnClick", function()
-	        if index > 1 then
-	            table.insert(names, index - 1, table.remove(names, index))
-	            PSK:RefreshPlayerList()
-	        end
-	    end)
-	
-	    -- Down Button
-	    local downButton = CreateFrame("Button", nil, row)
-	    downButton:SetSize(16, 16)
-	    downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-	    downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-	    downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
-	    downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
-	    downButton:SetScript("OnClick", function()
-	        if index < #names then
-	            table.insert(names, index + 1, table.remove(names, index))
-	            PSK:RefreshPlayerList()
-	        end
-	    end)
-	end
+        -- If selected row, show up/down buttons
+        if PSK.SelectedPlayerRow == index then
+            local upButton = CreateFrame("Button", nil, row)
+            upButton:SetSize(16, 16)
+            upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
+            upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+            upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+            upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+			
+			upButton:SetScript("OnEnter", function()
+			  GameTooltip:SetOwner(upButton, "ANCHOR_RIGHT")
+			  GameTooltip:SetText("Move Player Up", 1, 1, 1)
+			  GameTooltip:Show()
+			end)
+			upButton:SetScript("OnLeave", GameTooltip_Hide)
 
-	-- Make name text clickable so it can be selected
-	row:SetScript("OnClick", function()
-		PSK:SelectedPlayerRow = index
-		PSK:RefreshPlayerList()
-	end)
-        
-	yOffset = yOffset - 22
+
+            upButton:SetScript("OnClick", function()
+                if index > 1 then
+                    table.insert(names, index - 1, table.remove(names, index))
+                    PSK:RefreshPlayerList()
+                end
+            end)
+
+            local downButton = CreateFrame("Button", nil, row)
+            downButton:SetSize(16, 16)
+            downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+            downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+            downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+			
+			downButton:SetScript("OnEnter", function()
+			  GameTooltip:SetOwner(downButton, "ANCHOR_RIGHT")
+			  GameTooltip:SetText("Move Player Down", 1, 1, 1)
+			  GameTooltip:Show()
+			end)
+			downButton:SetScript("OnLeave", GameTooltip_Hide)
+			
+			
+            downButton:SetScript("OnClick", function()
+                if index < #names then
+                    table.insert(names, index + 1, table.remove(names, index))
+                    PSK:RefreshPlayerList()
+                end
+            end)
+			
+        end
+
+        yOffset = yOffset - 22
     end
 end
+
 
 
 ----------------------------------------
@@ -803,6 +821,21 @@ function PSK:GetLootThresholdName()
 	}
 
 	return qualityNames[threshold] or ("Unknown (" .. threshold .. ")")
+end
+
+-------------------------------------------
+-- Update the Loot Threshold On Change
+-------------------------------------------
+
+function PSK:UpdateLootThresholdLabel()
+    if not PSK.LootLabel then return end
+
+	local threshold = GetLootThreshold() or 2 -- fallback to Uncommon
+    -- local threshold = PSK.Settings.lootThreshold or 3
+    local color = PSK.RarityColors[threshold] or "ffffff"
+    local name = PSK.RarityNames[threshold] or "Rare"
+
+    PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
 end
 
 

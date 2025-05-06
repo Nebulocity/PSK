@@ -155,30 +155,30 @@ end
 -- Event Frame for Updates
 ----------------------------------------
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-eventFrame:RegisterEvent("PLAYER_LOGIN")
+-- local eventFrame = CreateFrame("Frame")
+-- eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+-- eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+-- eventFrame:RegisterEvent("PLAYER_LOGIN")
 
-eventFrame:SetScript("OnEvent", function(self, event)
-    UpdateGuildData()
-end)
+-- eventFrame:SetScript("OnEvent", function(self, event)
+    -- UpdatePlayerData()
+-- end)
 
 ----------------------------------------
--- Update Guild Data (live)
+-- Update Player Data (live)
 ----------------------------------------
 
--- function UpdateGuildData()
---     if not IsInGuild() then return end
+-- function UpdatePlayerData()
+--     if not IsInPlayer() then return end
 -- 
---     GuildRoster()
+--     PlayerRoster()
 -- 
 --     if not PSKDB.Players then
 --         PSKDB.Players = {}
 --     end
 -- 
---     for i = 1, GetNumGuildMembers() do
---         local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetGuildRosterInfo(i)
+--     for i = 1, GetNumPlayerMembers() do
+--         local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetPlayerRosterInfo(i)
 -- 
 --         if name then
 --             name = Ambiguate(name, "none") -- Remove realm name if needed
@@ -195,7 +195,7 @@ end)
 --     end
 -- 
     -- Refresh displays
---     PSK:RefreshGuildList()
+--     PSK:RefreshPlayerList()
 --     PSK:RefreshBidList()
 --  end
 
@@ -585,7 +585,7 @@ function PSK:RemovePlayerByScope(scope, rawName)
         print("[PSK] Could not find " .. nameProper .. " in the specified list(s).")
     end
 
-    PSK:RefreshGuildList()
+    PSK:RefreshPlayerList()
 end
 
 ------------------------------------------------
@@ -606,12 +606,12 @@ function PSK:AddPlayerFromCommand(name, listType, position)
     local nameLower = rawName:lower()
     local nameProper = CapitalizeName(rawName)
 
-    -- Check if name is in guild
-    local foundInGuild = false
-    for i = 1, GetNumGuildMembers() do
-        local gName = GetGuildRosterInfo(i)
+    -- Check if name is in player
+    local foundInPlayer = false
+    for i = 1, GetNumPlayerMembers() do
+        local gName = GetPlayerRosterInfo(i)
         if gName and Ambiguate(gName, "short"):lower() == nameLower then
-            foundInGuild = true
+            foundInPlayer = true
             break
         end
     end
@@ -640,8 +640,8 @@ function PSK:AddPlayerFromCommand(name, listType, position)
         end
     end
 
-    if not foundInGuild and not foundInRaidOrParty then
-        print("[PSK] Error: '" .. nameProper .. "' is not in your guild, raid, or party. Cannot add.")
+    if not foundInPlayer and not foundInRaidOrParty then
+        print("[PSK] Error: '" .. nameProper .. "' is not in your player, raid, or party. Cannot add.")
         return
     end
 
@@ -671,9 +671,9 @@ function PSK:AddPlayerFromCommand(name, listType, position)
         local online = false
         local inRaid = false
 
-        -- Try guild roster first
-        for i = 1, GetNumGuildMembers() do
-            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
+        -- Try player roster first
+        for i = 1, GetNumPlayerMembers() do
+            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetPlayerRosterInfo(i)
             if gName and Ambiguate(gName, "short"):lower() == nameLower then
                 class = gClassFile or class
                 level = gLevel or level
@@ -703,6 +703,17 @@ function PSK:AddPlayerFromCommand(name, listType, position)
     end
 
     print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
-    PSK:RefreshGuildList()
+    PSK:RefreshPlayerList()
 end
 
+
+
+
+local f = CreateFrame("Frame")
+f:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
+
+f:SetScript("OnEvent", function(self, event, ...)
+    if event == "PARTY_LOOT_METHOD_CHANGED" then
+        PSK:UpdateLootThresholdLabel()
+    end
+end)
