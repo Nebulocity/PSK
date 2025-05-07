@@ -15,6 +15,130 @@ PSK.ScrollFrames = PSK.ScrollFrames or {}
 local DEFAULT_COLUMN_WIDTH = 220
 local COLUMN_HEIGHT = 355
 
+local CLASS_NAME_TO_FILE = {
+    ["Warrior"] = "WARRIOR",
+    ["Paladin"] = "PALADIN",
+    ["Hunter"]  = "HUNTER",
+    ["Rogue"]   = "ROGUE",
+    ["Priest"]  = "PRIEST",
+    ["Shaman"]  = "SHAMAN",
+    ["Mage"]    = "MAGE",
+    ["Warlock"] = "WARLOCK",
+    ["Druid"]   = "DRUID"
+}
+
+
+---------------------------------------------------
+-- Populates player data for those in db
+---------------------------------------------------
+
+-- function PSK:GetPlayerInfo()
+    -- if not IsInGuild() then return end
+
+    -- for i = 1, GetNumGuildMembers() do
+        -- local fullName, _, _, level, _, zone, _, _, online, _, classFileName = GetGuildRosterInfo(i)
+        -- local name = Ambiguate(fullName or "", "short")
+        
+        -- if name and classFileName then
+            -- PSKDB.Players = PSKDB.Players or {}
+            -- PSKDB.Players[name] = {
+                -- class = classFileName,
+                -- level = level,
+                -- zone = zone,
+                -- online = online
+            -- }
+        -- end
+    -- end
+-- end
+
+
+---------------------------------------------------
+-- Populates player data for those in db
+-- Works only for players in your raid/party!!!
+---------------------------------------------------
+
+-- function PSK:UpdateVisiblePlayerInfo(name)
+    -- local unit = nil
+
+    -- --Try to match the name to a unit in your raid or party
+    -- if UnitExists("player") and UnitName("player") == name then
+        -- unit = "player"
+    -- else
+        -- for i = 1, GetNumGroupMembers() do
+            -- local unitID = IsInRaid() and ("raid"..i) or ("party"..i)
+            -- if UnitExists(unitID) and UnitName(unitID) == name then
+                -- unit = unitID
+                -- break
+            -- end
+        -- end
+    -- end
+
+    -- if unit then
+        -- local _, class = UnitClass(unit)
+        -- local level = UnitLevel(unit)
+        -- local zone = GetRealZoneText()
+        -- local online = not UnitIsDeadOrGhost(unit)
+
+        -- PSKDB.Players = PSKDB.Players or {}
+        -- PSKDB.Players[name] = {
+            -- class = class,
+            -- level = level,
+            -- zone = zone,
+            -- online = online
+        -- }
+    -- end
+-- end
+
+function PSK:UpdateVisiblePlayerInfo(name)
+    local class, level, zone, online = nil, "???", "???", false
+    local unit = nil
+
+    -- First: check if they're in raid or party
+    if UnitExists("player") and UnitName("player") == name then
+        unit = "player"
+    else
+        for i = 1, GetNumGroupMembers() do
+            local unitID = IsInRaid() and ("raid"..i) or ("party"..i)
+            if UnitExists(unitID) and UnitName(unitID) == name then
+                unit = unitID
+                break
+            end
+        end
+    end
+
+    if unit then
+        local localizedClass = select(2, UnitClass(unit))
+        -- class = CLASS_NAME_TO_FILE[localizedClass] or "SHAMAN"
+		local class = CLASS_NAME_TO_FILE[localizedClass] or PSKDB.Players[name] and PSKDB.Players[name].class or "SHAMAN"
+        level = UnitLevel(unit)
+        zone = GetRealZoneText()
+        online = not UnitIsDeadOrGhost(unit)
+    elseif IsInGuild() then
+        -- Check guild roster
+        for i = 1, GetNumGuildMembers() do
+            local fullName, _, _, gLevel, _, gZone, _, _, gOnline, _, classFile = GetGuildRosterInfo(i)
+            local shortName = Ambiguate(fullName or "", "short")
+            if shortName == name then
+                class = classFile or "SHAMAN"
+                level = gLevel or "???"
+                zone = gZone or "???"
+                online = gOnline or false
+                break
+            end
+        end
+    end
+
+    -- Update player info
+    if class then
+        PSKDB.Players = PSKDB.Players or {}
+        PSKDB.Players[name] = {
+            class = class,
+            level = level,
+            zone = zone,
+            online = online
+        }
+    end
+end
 
 ---------------------------------
 -- Award loot to selected player
@@ -165,7 +289,7 @@ end
 -- 
 --     local total = GetNumPlayerMembers()
 --     for i = 1, total do
---         local name, _, _, level, classFileName, _, _, _, online = GetPlayerRosterInfo(i)
+--         local name, _, _, level, classFileName, _, _, _, online = PSK:GetPlayerInfo(i)
 --         if name and level == 60 then
 --             name = Ambiguate(name, "short")
 --             local token = classFileName and string.upper(classFileName) or "UNKNOWN"
@@ -504,6 +628,9 @@ function PSK:RefreshPlayerList()
         row.bg:SetColorTexture(1, 0.5, 0, 0.2)
         row.bg:Hide()
 
+		PSK:UpdateVisiblePlayerInfo(name)
+
+
         -- Pull real player info
         local playerData = PSKDB.Players and PSKDB.Players[name]
         local class = (playerData and playerData.class) or "SHAMAN"
@@ -511,6 +638,7 @@ function PSK:RefreshPlayerList()
         local inRaid = (playerData and playerData.inRaid) or false
         local level = (playerData and playerData.level) or "???"
         local zone = (playerData and playerData.zone) or "???"
+		local fileClass = CLASS_NAME_TO_FILE[class] or "SHAMAN"
 
         row.playerData = {
             class = class,
@@ -520,6 +648,11 @@ function PSK:RefreshPlayerList()
             level = level,
             zone = zone,
         }
+
+		-- Track which index the selected player ended up in
+		if PSK.SelectedPlayer == name then
+			PSK.SelectedPlayerRow = index
+		end
 
         -- Position
         local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -542,9 +675,11 @@ function PSK:RefreshPlayerList()
 
         -- Click to select row
         row:SetScript("OnClick", function()
-            PSK.SelectedPlayerRow = index
-            PSK:RefreshPlayerList()
-        end)
+			PSK.SelectedPlayerRow = index
+			PSK.SelectedPlayer = name
+			PSK:HighlightSelectedPlayer()
+		end)
+
 
         -- Status
         local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -596,7 +731,7 @@ function PSK:RefreshPlayerList()
         -- If selected row, show up/down buttons
         if PSK.SelectedPlayerRow == index then
             local upButton = CreateFrame("Button", nil, row)
-            upButton:SetSize(16, 16)
+            upButton:SetSize(24, 24)
             upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
             upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
             upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
@@ -612,13 +747,15 @@ function PSK:RefreshPlayerList()
 
             upButton:SetScript("OnClick", function()
                 if index > 1 then
-                    table.insert(names, index - 1, table.remove(names, index))
-                    PSK:RefreshPlayerList()
-                end
+					local movedName = names[index]
+					table.insert(names, index - 1, table.remove(names, index))
+					PSK.SelectedPlayer = movedName
+					PSK:RefreshPlayerList()
+				end
             end)
 
             local downButton = CreateFrame("Button", nil, row)
-            downButton:SetSize(16, 16)
+            downButton:SetSize(24, 24)
             downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
             downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
             downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
@@ -634,16 +771,53 @@ function PSK:RefreshPlayerList()
 			
             downButton:SetScript("OnClick", function()
                 if index < #names then
-                    table.insert(names, index + 1, table.remove(names, index))
-                    PSK:RefreshPlayerList()
-                end
-            end)
-			
+					local movedName = names[index]
+					table.insert(names, index + 1, table.remove(names, index))
+					PSK.SelectedPlayer = movedName
+					PSK:RefreshPlayerList()
+				end
+            end)		
         end
+
+		PSK:HighlightSelectedPlayer()
 
         yOffset = yOffset - 22
     end
 end
+
+
+
+---------------------------------------------------
+-- Highlight the selected player in main/tier list
+---------------------------------------------------
+
+function PSK:HighlightSelectedPlayer()
+    local scrollChildren = PSK.ScrollChildren.Main
+    if not scrollChildren or not PSK.SelectedPlayer then return end
+
+    for _, row in ipairs({scrollChildren:GetChildren()}) do
+        if row.playerData and row.playerData.name == PSK.SelectedPlayer then
+            if not row.Highlight then
+                row.Highlight = row:CreateTexture(nil, "ARTWORK")
+                row.Highlight:SetAllPoints(row)
+                row.Highlight:SetBlendMode("ADD")
+            end
+
+            -- Set highlight to class color
+            local class = row.playerData.class or "SHAMAN"
+            local color = RAID_CLASS_COLORS[class] or { r = 1, g = 1, b = 1 }
+            row.Highlight:SetColorTexture(color.r, color.g, color.b, 0.25)
+            row.Highlight:Show()
+        else
+            if row.Highlight then
+                row.Highlight:Hide()
+            end
+        end
+    end
+end
+
+
+
 
 
 

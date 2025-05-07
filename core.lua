@@ -1,12 +1,15 @@
 -- core.lua
 
--- core.lua, right at the top
--- At the top of core.lua
-local PSK = select(2, ...)
-_G.PSKGlobal = _G.PSKGlobal or {}
 
--- Initialize saved variables
-PSKDB = PSKDB or {}
+local PSK = select(2, ...)
+
+-- Ensure PSKDB is initialized correctly
+if not PSKDB then PSKDB = {} end
+if not PSKDB.MainList then PSKDB.MainList = {} end
+if not PSKDB.TierList then PSKDB.TierList = {} end
+if not PSKDB.Players then PSKDB.Players = {} end
+
+_G.PSKGlobal = _G.PSKGlobal or {}
 
 -- Use the persistent loot drop list
 PSKGlobal.LootDrops = PSKGlobal.LootDrops or {}
@@ -16,12 +19,10 @@ PSK.LootDrops = PSKGlobal.LootDrops
 PSKDB.LootLogs = PSKDB.LootLogs or {}
 
 
-
 -- For Tracking
 PSKDB = PSKDB or {}             
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
-
 
 
 local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
@@ -156,8 +157,6 @@ end
 ----------------------------------------
 
 -- local eventFrame = CreateFrame("Frame")
--- eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
--- eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 -- eventFrame:RegisterEvent("PLAYER_LOGIN")
 
 -- eventFrame:SetScript("OnEvent", function(self, event)
@@ -169,35 +168,35 @@ end
 ----------------------------------------
 
 -- function UpdatePlayerData()
---     if not IsInPlayer() then return end
--- 
---     PlayerRoster()
--- 
---     if not PSKDB.Players then
---         PSKDB.Players = {}
---     end
--- 
---     for i = 1, GetNumPlayerMembers() do
---         local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetPlayerRosterInfo(i)
--- 
---         if name then
---             name = Ambiguate(name, "none") -- Remove realm name if needed
---             if not PSKDB.Players[name] then
---                 PSKDB.Players[name] = {}
---             end
--- 
---             PSKDB.Players[name].class = classFileName
---             PSKDB.Players[name].online = online
---             PSKDB.Players[name].inRaid = UnitInRaid(name) ~= nil
--- 			PSKDB.Players[name].level = level
--- 			PSKDB.Players[name].zone = zone
---         end
---     end
--- 
+    -- if not IsInPlayer() then return end
+
+    -- PlayerRoster()
+
+    -- if not PSKDB.Players then
+        -- PSKDB.Players = {}
+    -- end
+
+    -- for i = 1, GetNumPlayerMembers() do
+        -- local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetPlayerRosterInfo(i)
+
+        -- if name then
+            -- name = Ambiguate(name, "none") -- Remove realm name if needed
+            -- if not PSKDB.Players[name] then
+                -- PSKDB.Players[name] = {}
+            -- end
+
+            -- PSKDB.Players[name].class = classFileName
+            -- PSKDB.Players[name].online = online
+            -- PSKDB.Players[name].inRaid = UnitInRaid(name) ~= nil
+			-- PSKDB.Players[name].level = level
+			-- PSKDB.Players[name].zone = zone
+        -- end
+    -- end
+
     -- Refresh displays
---     PSK:RefreshPlayerList()
---     PSK:RefreshBidList()
---  end
+    -- PSK:RefreshPlayerList()
+    -- PSK:RefreshBidList()
+ -- end
 
 ----------------------------------------
 -- Bidding System 
@@ -592,7 +591,7 @@ end
 -- Capitalize names that get added to the lists
 ------------------------------------------------
 
-local function CapitalizeName(name)
+function PSKCapitalizeName(name)
     return name:sub(1, 1):upper() .. name:sub(2):lower()
 end
 
@@ -604,7 +603,7 @@ function PSK:AddPlayerFromCommand(name, listType, position)
     -- Normalize and clean input
     local rawName = Ambiguate(name, "short"):gsub("%s+", "")
     local nameLower = rawName:lower()
-    local nameProper = CapitalizeName(rawName)
+    local nameProper = PSK:AddPlayerFromCommand(rawName)
 
     -- Check if name is in player
     local foundInPlayer = false

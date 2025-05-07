@@ -40,7 +40,7 @@ end)
 -- Button to add players to Main/Tier list
 -------------------------------------------
 
-PSK.AddPlayerButton = CreateFrame("Button", nil, PSK.AddSection, "GameMenuButtonTemplate")
+PSK.AddPlayerButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
 PSK.AddPlayerButton:SetPoint("RIGHT", PSK.Headers.Main, "RIGHT", -15, 30)
 PSK.AddPlayerButton:SetSize(80, -25)
 PSK.AddPlayerButton:SetText("Add Player")
@@ -54,7 +54,6 @@ PSK.AddPlayerButton:SetScript("OnClick", function()
     end
 
     local list = (PSK.SelectedList == "Main") and PSKDB.MainList or PSKDB.TierList
-
     for _, existing in ipairs(list) do
         if existing:lower() == playerName:lower() then
             print("|cffff4444[PSK]|r Player already exists in " .. PSK.SelectedList .. " list.")
@@ -62,19 +61,48 @@ PSK.AddPlayerButton:SetScript("OnClick", function()
         end
     end
 
+    -- Add to list
     if PSK.SelectedPosition == "Top" then
         table.insert(list, 1, playerName)
     else
         table.insert(list, playerName)
     end
 
+    -- Add player info to PSKDB.Players if not already present
+    if not PSKDB.Players[playerName] then
+        PSKDB.Players[playerName] = {
+            class = "UNKNOWN",
+            online = false,
+            level = "???",
+            zone = "???",
+        }
+    end
+
     print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. PSK.SelectedList .. " list (" .. (PSK.SelectedPosition or "Bottom") .. ").")
     
-    -- Clear the input box
+    -- Clear the input box and refresh the list
     PSK.NameInput:SetText("")
-
-    -- Refresh display
     PSK:RefreshPlayerList()
+end)
+
+
+
+---------------------------------------------
+-- Add Player Frame
+---------------------------------------------
+
+-- Create the player name input box
+PSK.NameInput = CreateFrame("EditBox", nil, PSK.ContentFrame, "InputBoxTemplate")
+PSK.NameInput:SetSize(120, 20)
+PSK.NameInput:SetPoint("LEFT", PSK.AddPlayerButton, "RIGHT", 10, 0)
+PSK.NameInput:SetAutoFocus(false)
+PSK.NameInput:SetText("")
+
+-- Optional: Clear placeholder text on focus
+PSK.NameInput:SetScript("OnEditFocusGained", function(self)
+    if self:GetText() == "" then
+        self:SetText("")
+    end
 end)
 
 

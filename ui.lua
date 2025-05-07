@@ -88,16 +88,6 @@ PSK.LogsFrame:Hide()
 
 PSK.CurrentList = "Main"
 
----------------------------------------------
--- Add Player Frame
----------------------------------------------
-
--- Input Box next to Add Player button
--- PSK.NameInput = CreateFrame("EditBox", nil, PSK.AddSection, "InputBoxTemplate")
--- PSK.NameInput:SetSize(120, 20)
--- PSK.NameInput:SetPoint("LEFT", PSK.AddPlayerButton, "RIGHT", 10, 0)
--- PSK.NameInput:SetAutoFocus(false)
--- PSK.NameInput:SetText("Enter Name")
 
 
 
@@ -424,14 +414,16 @@ PSK.SettingsFrame:Hide()
 -- Refresh lists on load
 ----------------------------------
 
-PSK:RefreshPlayerList()
-PSK:RefreshBidList()
+
 
 -- Timed refresh to ensure logs/loot lists are ready on player login
 C_Timer.After(0.1, function()
     if PSK.RefreshLogList then
         PSK:RefreshLogList()
 		PSK:RefreshLootList()
+		PSK:RefreshPlayerList()
+		PSK:RefreshBidList()
+		PSK:UpdateVisiblePlayerInfo()
 		PSK:UpdateLootThresholdLabel()
     end
 end)
