@@ -9,7 +9,9 @@ if not PSKDB then PSKDB = {} end
 PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 1 } -- change to 3 for rare
 PSK.Settings = CopyTable(PSKDB.Settings)
 local mainListCount = #PSKDB.MainList or 0
-local scrollFrameHeight = -150
+local pskTabScrollFrameHeight = -115
+local manageTabScrollFrameHeight = -87
+
 ------------------------
 -- Initialize containers
 ------------------------
@@ -23,7 +25,7 @@ PSK.Headers = {}
 ------------------------
 
 PSK.MainFrame = CreateFrame("Frame", "PSKMainFrame", UIParent, "BasicFrameTemplateWithInset")
-PSK.MainFrame:SetSize(705, 550)
+PSK.MainFrame:SetSize(705, 500)
 PSK.MainFrame:SetPoint("CENTER")
 PSK.MainFrame:SetMovable(true)
 PSK.MainFrame:EnableMouse(true)
@@ -48,22 +50,6 @@ PSK.MainFrame.title:SetText("Perchance PSK - Perchance Some Loot?")
 
 PSK.ContentFrame = CreateFrame("Frame", nil, PSK.MainFrame)
 PSK.ContentFrame:SetAllPoints()
-
-------------------------
--- Manage Frame (tab)
-------------------------
-
-PSK.ManageFrame = CreateFrame("Frame", nil, PSK.MainFrame, "BackdropTemplate")
-PSK.ManageFrame:SetPoint("TOPLEFT", 8, -28)
-PSK.ManageFrame:SetPoint("BOTTOMRIGHT", -6, 8)
-PSK.ManageFrame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\Tooltips\\UI-DialogBox-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
-    insets = { left = 4, right = 4, top = 4, bottom = 4 },
-})
-PSK.ManageFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
-PSK.ManageFrame:Hide()
 
 ------------------------
 -- Settings Frame (tab)
@@ -97,6 +83,23 @@ PSK.LogsFrame:SetBackdrop({
 PSK.LogsFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
 PSK.LogsFrame:Hide()
 
+------------------------
+-- Manage Frame (tab)
+------------------------
+
+PSK.ManageFrame = CreateFrame("Frame", nil, PSK.MainFrame, "BackdropTemplate")
+PSK.ManageFrame:SetPoint("TOPLEFT", 8, -28)
+PSK.ManageFrame:SetPoint("BOTTOMRIGHT", -6, 8)
+PSK.ManageFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+PSK.ManageFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+PSK.ManageFrame:Hide()
+
+
 ---------------------------------------------
 -- Set the default selected list (main/tier)
 ---------------------------------------------
@@ -109,7 +112,7 @@ PSK.CurrentList = "Main"
 ----------------------------------------------
 
 local playerScroll, playerChild, playerFrame, playerHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, scrollFrameHeight, "PSK Main (" .. mainListCount .. ")")
+    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, pskTabScrollFrameHeight, "PSK Main (" .. mainListCount .. ")")
 PSK.ScrollFrames.Main = playerScroll
 PSK.ScrollChildren.Main = playerChild
 playerHeader:ClearAllPoints()
@@ -122,12 +125,103 @@ PSK.Headers.Main = playerHeader
 ----------------------------------------------
 
 local lootScroll, lootChild, lootFrame, lootHeader =
-    CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, scrollFrameHeight, "Loot Drops")
+    CreateBorderedScrollFrame("PSKLootScrollFrame", PSK.ContentFrame, 240, pskTabScrollFrameHeight, "Loot Drops")
 PSK.ScrollFrames.Loot = lootScroll
 PSK.ScrollChildren.Loot = lootChild
 lootHeader:ClearAllPoints()
 lootHeader:SetPoint("TOPLEFT", lootScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Loot = lootHeader
+
+----------------------------------------------
+-- Parent Bidding scroll frame to ContentFrame
+----------------------------------------------
+
+local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
+local bidScroll, bidChild, bidFrame, bidHeader =
+    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, pskTabScrollFrameHeight, "Bids (" .. bidCount .. ")", 220)
+PSK.ScrollFrames.Bid = bidScroll
+PSK.ScrollChildren.Bid = bidChild
+bidHeader:ClearAllPoints()
+bidHeader:SetPoint("TOPLEFT", bidScroll, "TOPLEFT", 0, 20)
+PSK.Headers.Bid = bidHeader
+
+-----------------------------------------------
+--  Parent Manage List Headers to ManageFrame
+-----------------------------------------------
+
+local mainHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+mainHeader:SetPoint("TOPLEFT", 10, -10)
+-- mainHeader:SetText("Available for Main List")
+
+local tierHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+tierHeader:SetPoint("TOPLEFT", 365, -10)
+-- tierHeader:SetText("Available for Tier List")
+
+-- Create the two scroll lists
+local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 2, manageTabScrollFrameHeight, "Available PSK Main Members")
+local tierScroll, tierChild, tierFrame, tierScrollHeader = CreateBorderedScrollFrame("PSKTierAvailableScroll", PSK.ManageFrame, 232, manageTabScrollFrameHeight, "Available PSK Tier Members")
+
+-- Add Instructions Label to Manage Frame
+-- local instructionsLabel = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+-- instructionsLabel:SetPoint("TOP", PSK.ManageFrame, "TOP", 0, -25)
+-- instructionsLabel:SetText("Click the + sign to add a player to each respective list.")
+-- instructionsLabel:SetTextColor(1, 0.85, 0.1)  -- Gold-like color
+
+-- Set headers for scroll lists
+mainScrollHeader:SetPoint("TOPLEFT", mainScroll, "TOPLEFT", 0, 20)
+tierScrollHeader:SetPoint("TOPLEFT", tierScroll, "TOPLEFT", 0, 20)
+
+-- Store these for later updates
+PSK.ScrollFrames.MainAvailable = mainScroll
+PSK.ScrollChildren.MainAvailable = mainChild or CreateFrame("Frame", nil, mainScroll)
+PSK.Headers.MainAvailable = mainScrollHeader
+
+PSK.ScrollFrames.TierAvailable = tierScroll
+PSK.ScrollChildren.TierAvailable = tierChild or CreateFrame("Frame", nil, tierScroll)
+PSK.Headers.TierAvailable = tierScrollHeader
+
+
+-----------------------------------------
+-- Add Background for Instructions Label
+-----------------------------------------
+
+local instructionsBg = CreateFrame("Frame", nil, PSK.ManageFrame, "BackdropTemplate")
+instructionsBg:SetPoint("TOPLEFT", 10, -10)
+instructionsBg:SetPoint("TOPRIGHT", -10, -10)
+instructionsBg:SetHeight(40)
+instructionsBg:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+instructionsBg:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+
+-- Create Inline Icon and Text
+local instructionContainer = CreateFrame("Frame", nil, instructionsBg)
+instructionContainer:SetSize(600, 40)  -- Width should match the width of instructionsBg
+instructionContainer:SetPoint("TOPLEFT", instructionsBg, "TOPLEFT", -10, 0)
+
+-- Add the First Part of the Text
+local textLeft = instructionContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+textLeft:SetPoint("LEFT", instructionContainer, "LEFT", 10, -10)
+textLeft:SetText("Click the ")
+textLeft:SetTextColor(1, 0.85, 0.1)
+
+-- Add the + Icon
+local plusIcon = instructionContainer:CreateTexture(nil, "OVERLAY")
+plusIcon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+plusIcon:SetSize(24, 24)
+plusIcon:SetPoint("LEFT", textLeft, "RIGHT", 4, -2)
+
+-- Add the Second Part of the Text
+local textRight = instructionContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+textRight:SetPoint("LEFT", plusIcon, "RIGHT", 4, 2)
+textRight:SetText(" to add a player to each respective list.")
+textRight:SetTextColor(1, 0.85, 0.1)
+
+
+
 
 ------------------------------------------------
 -- Dialog for clearing loot drops
@@ -146,25 +240,12 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
 }
 
 ----------------------------------------------
--- Parent Bidding scroll frame to ContentFrame
-----------------------------------------------
-
-local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
-local bidScroll, bidChild, bidFrame, bidHeader =
-    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, scrollFrameHeight, "Bids (" .. bidCount .. ")", 220)
-PSK.ScrollFrames.Bid = bidScroll
-PSK.ScrollChildren.Bid = bidChild
-bidHeader:ClearAllPoints()
-bidHeader:SetPoint("TOPLEFT", bidScroll, "TOPLEFT", 0, 20)
-PSK.Headers.Bid = bidHeader
-
-----------------------------------------------
 -- Warning if loot not being recorded
 ----------------------------------------------
 
 local lootRecordingWarning = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lootRecordingWarning:SetPoint("BOTTOMLEFT", lootHeader, "TOPLEFT", 30, 4)
-lootRecordingWarning:SetText("Loot is not being recorded!")
+lootRecordingWarning:SetPoint("CENTER", lootHeader, "CENTER", 80, 20)
+lootRecordingWarning:SetText(">>> Loot is not being recorded! <<<")
 lootRecordingWarning:SetTextColor(1, 0, 0)
 lootRecordingWarning:Hide()
 
@@ -270,30 +351,6 @@ lootHeader:SetText("Loot Drops")
 
 
 
-------------------------------------
---  Create Manage list headers
-------------------------------------
-
-local mainHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-mainHeader:SetPoint("TOPLEFT", 10, -10)
--- mainHeader:SetText("Available for Main List")
-
-local tierHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-tierHeader:SetPoint("TOPLEFT", 365, -10)
--- tierHeader:SetText("Available for Tier List")
-
--- Create the two scroll lists
-local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 10, -30, "Available Main Members", 250)
-local tierScroll, tierChild, tierFrame, tierScrollHeader = CreateBorderedScrollFrame("PSKTierAvailableScroll", PSK.ManageFrame, 365, -30, "Available Tier Members", 250)
-
--- Store these for later updates
-PSK.ScrollFrames.MainAvailable = mainScroll
-PSK.ScrollChildren.MainAvailable = mainChild or CreateFrame("Frame", nil, mainScroll)
-PSK.Headers.MainAvailable = mainScrollHeader
-
-PSK.ScrollFrames.TierAvailable = tierScroll
-PSK.ScrollChildren.TierAvailable = tierChild or CreateFrame("Frame", nil, tierScroll)
-PSK.Headers.TierAvailable = tierScrollHeader
 
 
 
@@ -430,7 +487,7 @@ C_Timer.After(0.1, function()
 		PSK:RefreshLootList()
 		PSK:RefreshPlayerList()
 		PSK:RefreshBidList()
-		PSK:UpdateVisiblePlayerInfo()
+		-- PSK:UpdateVisiblePlayerInfo()
 		PSK:UpdateLootThresholdLabel()
 		-- PSK:CreateGuildMemberDropdown()
 

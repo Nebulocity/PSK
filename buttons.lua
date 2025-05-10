@@ -24,7 +24,7 @@ PSK.ToggleListButton:SetScript("OnClick", function()
     local header = PSK.Headers.Main
     local count = listKey == "Main" and #PSKDB.MainList or #PSKDB.TierList
     if header then
-        header:SetText((listKey == "Main" and "PSK Main" or "PSK Tier") .. " (" .. count .. ")")
+        header:SetText((listKey == "Main" and "PSK Main List" or "PSK Tier List") .. " (" .. count .. ")")
     end
 
 	if PSK.PlayRandomPeonSound then
@@ -34,61 +34,6 @@ PSK.ToggleListButton:SetScript("OnClick", function()
     PSK:RefreshPlayerList()
     PSK:RefreshBidList()
 end)
-
-
--------------------------------------------
--- Button to add players to Main/Tier list
--------------------------------------------
-
-PSK.AddPlayerButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
-PSK.AddPlayerButton:SetPoint("RIGHT", PSK.Headers.Main, "RIGHT", -15, 30)
-PSK.AddPlayerButton:SetSize(80, -25)
-PSK.AddPlayerButton:SetText("Add Player")
-
-PSK.AddPlayerButton:SetScript("OnClick", function()
-    local playerName = strtrim(PSK.NameInput:GetText() or "")
-    
-    if playerName == "" then
-        print("|cffff4444[PSK]|r Please enter a player name.")
-        return
-    end
-
-    local list = (PSK.SelectedList == "Main") and PSKDB.MainList or PSKDB.TierList
-    for _, existing in ipairs(list) do
-        if existing:lower() == playerName:lower() then
-            print("|cffff4444[PSK]|r Player already exists in " .. PSK.SelectedList .. " list.")
-            return
-        end
-    end
-
-    -- Add to list
-    if PSK.SelectedPosition == "Top" then
-        table.insert(list, 1, playerName)
-    else
-        table.insert(list, playerName)
-    end
-
-    -- Add player info to PSKDB.Players if not already present
-    if not PSKDB.Players[playerName] then
-        PSKDB.Players[playerName] = {
-            class = "UNKNOWN",
-            online = false,
-            level = "???",
-            zone = "???",
-        }
-    end
-
-    print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. PSK.SelectedList .. " list (" .. (PSK.SelectedPosition or "Bottom") .. ").")
-    
-    -- Clear the input box and refresh the list
-    PSK:RefreshPlayerList()
-end)
-
-
-
----------------------------------------------
--- Add Player Frame
----------------------------------------------
 
 
 ------------------------------
@@ -180,11 +125,15 @@ PSK.BidButton.biddingActive = false
 PSK.BidButton:SetScript("OnClick", function(self)
     self.biddingActive = not self.biddingActive
 	
+	
     if self.biddingActive then
-        self:SetText("Close Bidding")
+		PlaySound(5275)
+		self:SetText("Close Bidding")
+		
         -- Add logic for starting bidding phase here
         Announce("[PSK] Bidding has begun! Whisper 'bid' to join.")
     else
+		PlaySound(5274)
         self:SetText("Start Bidding")
         -- Add logic for closing bidding here
         Announce("[PSK] Bidding has ended.")
@@ -255,7 +204,7 @@ PSK.BidButton:SetScript("OnClick", function()
 		PSK.BidButton.Border:Show()
 		PSK.BidButton.Border.Pulse:Play()
 		PSK:StartBidding()
-		
+		PlaySound(5274)
 		if PSK.Settings.buttonSoundsEnabled then
 			PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
 		end
