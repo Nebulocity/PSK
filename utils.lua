@@ -118,27 +118,57 @@ function PerformAward(index)
     end
     table.insert(list, playerName)
 
-    -- Announce
-    -- Determine awarded item and announce
-	local itemLink = PSK.SelectedItem
-	local itemID = itemLink and tonumber(itemLink:match("item:(%d+)"))
+
+	-- Announce the award
+	-- local selectedItemLink = item.itemLink
+
+	-- Use GetItemInfo to ensure a fully formatted link
+	-- if item.itemID and not selectedItemLink then
+		-- local itemID = item.itemID
+		-- local fullItemName, itemLink = GetItemInfo(itemID)
+
+		-- If the item isn't cached, request it asynchronously
+		-- if not itemLink then
+			-- print("[PSK] Item not cached, attempting to request: " .. itemID)
+			-- local frame = CreateFrame("Frame")
+			-- frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+			-- frame:SetScript("OnEvent", function(self, event, receivedItemID)
+				-- if receivedItemID == itemID then
+					-- local _, resolvedLink = GetItemInfo(itemID)
+					-- if resolvedLink then
+						-- Announce(string.format("[PSK] Awarded %s to %s!", resolvedLink, coloredName))
+					-- else
+						-- print("[PSK] Error: Item still not available for ID", itemID)
+					-- end
+					-- self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+					-- self:SetScript("OnEvent", nil)
+				-- end
+			-- end)
+			-- return  -- Don't continue until the item is fully loaded
+		-- end
+
+		-- selectedItemLink = itemLink
+	-- end
 
 	-- Get class color
 	local color = RAID_CLASS_COLORS[playerClass or "PRIEST"] or { r = 1, g = 1, b = 1 }
 	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
 
-	-- Announce
-	if itemLink then
-		Announce(string.format("[PSK] %s receives %s!", coloredName, itemLink))
-	else
-		Announce(string.format("[PSK] %s receives loot.", coloredName))
-	end
+	-- Announce the award with the item link
+	-- if selectedItemLink and playerName then
+		-- Announce(string.format("[PSK] Awarded %s to %s!", selectedItemLink, coloredName))
+	-- else
+		-- print("[PSK] Error: Missing item link or player name.")
+	-- end
 
+	local itemLink = PSK.SelectedItem
+	local itemName = GetItemInfo(itemLink) or itemLink
+	Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
 
     -- Log the award
     table.insert(PSKDB.LootLogs, {
         player = playerName,
-        class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "PRIEST",
+        class = playerClass or "PRIEST",
         itemLink = item.itemLink,
         itemTexture = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark",
         timestamp = date("%I:%M%p %m/%d/%Y"),
@@ -152,11 +182,11 @@ function PerformAward(index)
         PSK:RefreshLogList()
     end
 
-    Announce("[PSK] Awarded loot to " .. playerName .. "!")
     PSK:RefreshPlayerList()
     PSK:RefreshBidList()
     PlaySound(12867)
 end
+
 
 
 ---------------------------------
@@ -173,13 +203,16 @@ end
 ----------------------------------------------
 
 function Announce(message)
-	if IsInRaid() then
-		SendChatMessage(message, "RAID")
-	elseif IsInGroup() then
-		SendChatMessage(message, "PARTY")
-	else
-		print(message)
-	end
+    local playerName = UnitName("player")
+
+    if IsInRaid() then
+        SendChatMessage(message, "RAID")
+    elseif IsInGroup() then
+        SendChatMessage(message, "PARTY")
+    else
+        SendChatMessage(message, "WHISPER", nil, playerName)
+    end
+	
 end
 
 
@@ -300,7 +333,7 @@ function PSK:RefreshLootList()
             PSK.SelectedItem = loot.itemLink
             PSK.SelectedItemData = loot  -- Store the full loot item data
             PSK.BidButton:Enable()
-            Announce("[PSK] Selected item for bidding: " .. loot.itemLink)
+            print("[PSK] Selected item for bidding: " .. loot.itemLink)
 
             -- Pulse animation
             local pulse = row:CreateAnimationGroup()
@@ -948,7 +981,45 @@ function PSK:RefreshBidList()
         nameText:SetPoint("LEFT", classIcon, "RIGHT", 4, 0)
         nameText:SetText(bidData.name)
 
+		-- Not in List Icon
+        if bidData.notListed then
+            local warningIcon = row:CreateTexture(nil, "OVERLAY")
+            warningIcon:SetSize(16, 16)
+            warningIcon:SetPoint("LEFT", nameText, "RIGHT", 8, 0)
+            warningIcon:SetTexture("Interface\\Common\\UI-StopButton")
 
+            warningIcon:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+                GameTooltip:SetText(bidData.name, 1, 0.2, 0.2)
+                GameTooltip:AddLine("This player is not in the Main or Tier lists.", 1, 0.7, 0.2)
+                GameTooltip:Show()
+            end)
+
+            warningIcon:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+
+            -- Add glowing pulse
+            local pulse = row:CreateAnimationGroup()
+            local fadeOut = pulse:CreateAnimation("Alpha")
+            fadeOut:SetFromAlpha(0.8)
+            fadeOut:SetToAlpha(0.4)
+            fadeOut:SetDuration(0.5)
+            fadeOut:SetOrder(1)
+
+            local fadeIn = pulse:CreateAnimation("Alpha")
+            fadeIn:SetFromAlpha(0.4)
+            fadeIn:SetToAlpha(0.8)
+            fadeIn:SetDuration(0.5)
+            fadeIn:SetOrder(2)
+
+            pulse:SetLooping("REPEAT")
+            pulse:Play()
+
+            row.bg:SetColorTexture(1, 0, 0, 0.2) -- Light red background
+            row.bg:Show()
+        end
+		
 		-- Award Button (to the right of the name)
 		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 		awardButton:SetSize(16, 16)
@@ -1045,9 +1116,6 @@ function PSK:RefreshBidList()
 			end
 			GameTooltip:Hide()
 		end)
-
-
-
 
         yOffset = yOffset - 22
     end

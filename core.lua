@@ -204,7 +204,6 @@ function PSK:StartBidding()
 		return
 	end
 
-	
     BiddingOpen = true
     PSK.BidEntries = {}
 	
@@ -223,55 +222,32 @@ function PSK:StartBidding()
     
 	local itemLink = PSK.SelectedItem
 	local itemName = GetItemInfo(itemLink) or itemLink
-	Announce("[PSK] Bidding has started for " .. itemName .. "! 15 seconds remaining.")
-
-
-
-	C_Timer.After(5, function()
-		if BiddingOpen then
-			Announce("[PSK] 10 seconds left to bid!")
-		end
-	end)
-
-	C_Timer.After(10, function()
-		if BiddingOpen then
-			Announce("[PSK] 5 seconds left to bid!")
-		end
-	end)
-
-	C_Timer.After(11, function()
-		if BiddingOpen then
-			Announce("[PSK] 4 seconds left to bid!")
-		end
-	end)
 	
-	C_Timer.After(12, function()
-		if BiddingOpen then
-			Announce("[PSK] 3 seconds left to bid!")
-		end
-	end)
-	
-	C_Timer.After(13, function()
-		if BiddingOpen then
-			Announce("[PSK] 2 seconds left to bid!")
-		end
-	end)
-	
-	C_Timer.After(14, function()
-		if BiddingOpen then
-			Announce("[PSK] 1 seconds left to bid!")
-		end
-	end)
+    -- Use the full item link for clickable text
+    Announce("[PSK] Bidding has started for " .. itemLink .. "! 15 seconds remaining.")
+	Announce("[PSK] Type 'bid' or 'retract' to place/remove a bid.")
+	Announce("[PSK] -----------------------------------------------------------------")
 
-	C_Timer.After(15, function()
-		if BiddingOpen then
-			PSK:CloseBidding()
-		end
-	end)
+    -- Countdown Messages
+    local countdownTimes = {15, 10, 5, 4, 3, 2, 1}
+    for _, seconds in ipairs(countdownTimes) do
+        C_Timer.After(15 - seconds, function()
+            if BiddingOpen then
+                Announce("[PSK] " .. seconds .. " seconds left to bid on " .. itemLink .. "!")
+            end
+        end)
+    end
 
+    -- Auto-close bidding after 15 seconds
+    C_Timer.After(15, function()
+        if BiddingOpen then
+            PSK:CloseBidding()
+        end
+    end)
 
     PSK:RefreshBidList()
 end
+
 
 function PSK:CloseBidding()
     BiddingOpen = false
@@ -345,55 +321,75 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
     if not BiddingOpen then return end
     if not sender then return end
 
+    -- Ignore messages from the addon itself
+    if msg:find("^%[PSK%]") then
+        return
+    end
+
+    -- Strip realm name if present
+    local simpleName = Ambiguate(sender, "short")
     msg = msg:lower()
+
+    -- Handle bid messages
     if msg:find("bid") then
-        local simpleName = sender:match("^(.-)%-.+") or sender
         AddBid(simpleName)
     end
 	
-	if msg:find("retract") then
-        local simpleName = sender:match("^(.-)%-.+") or sender
+    -- Handle retract messages
+    if msg:find("retract") then
         RetractBid(simpleName)
     end
 end)
 
+
 ------------------------------------------
--- Add a bid
+-- Add a bid, including unlisted players
 ------------------------------------------
 
 function AddBid(name)
     if not name then return end
 
+    -- Prevent duplicate bids
     for _, entry in ipairs(PSK.BidEntries) do
         if entry.name == name then
             return -- Already bid
         end
     end
 
-    local names = {}
-    if PSK.CurrentList == "Main" and PSKDB.MainList then
-        names = PSKDB.MainList
-    elseif PSK.CurrentList == "Tier" and PSKDB.TierList then
-        names = PSKDB.TierList
+    -- Attempt to find the player in the main or tier lists
+    local playerData = PSKDB.Players and PSKDB.Players[name]
+    local playerInList = false
+
+    local function isPlayerInList(list)
+        for index, playerName in ipairs(list) do
+            if playerName == name then
+                playerInList = true
+                return index
+            end
+        end
+        return nil
     end
 
-    for index, playerName in ipairs(names) do
-        if playerName == name then
-            local playerData = PSKDB.Players and PSKDB.Players[name] or {}
+    local position = isPlayerInList(PSKDB.MainList) or isPlayerInList(PSKDB.TierList) or (#PSK.BidEntries + 1)
 
-            table.insert(PSK.BidEntries, {
-                position = index,
-                name = name,
-                class = playerData.class,
-                online = playerData.online,
-                inRaid = playerData.inRaid,
-            })
+    -- Add to BidEntries with a note if they aren't in the main or tier list
+    table.insert(PSK.BidEntries, {
+        position = position,
+        name = name,
+        class = playerData and playerData.class or "UNKNOWN",
+        online = playerData and playerData.online or false,
+        inRaid = playerData and playerData.inRaid or false,
+        notListed = not playerInList,
+    })
 
-            PSK:RefreshBidList()
-            break
-        end
+    PSK:RefreshBidList()
+
+    -- Print a warning if the player isn't in the lists
+    if not playerInList then
+        print("[PSK] Warning: " .. name .. " is not in the Main or Tier lists.")
     end
 end
+
 
 ------------------------------------------
 -- Scan these channels for the word "retract"
