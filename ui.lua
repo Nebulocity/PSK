@@ -49,6 +49,21 @@ PSK.MainFrame.title:SetText("Perchance PSK - Perchance Some Loot?")
 PSK.ContentFrame = CreateFrame("Frame", nil, PSK.MainFrame)
 PSK.ContentFrame:SetAllPoints()
 
+------------------------
+-- Manage Frame (tab)
+------------------------
+
+PSK.ManageFrame = CreateFrame("Frame", nil, PSK.MainFrame, "BackdropTemplate")
+PSK.ManageFrame:SetPoint("TOPLEFT", 8, -28)
+PSK.ManageFrame:SetPoint("BOTTOMRIGHT", -6, 8)
+PSK.ManageFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+PSK.ManageFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+PSK.ManageFrame:Hide()
 
 ------------------------
 -- Settings Frame (tab)
@@ -89,12 +104,6 @@ PSK.LogsFrame:Hide()
 PSK.CurrentList = "Main"
 
 
-
-
-
-
-
-
 ----------------------------------------------
 -- Parent Player scroll frame to ContentFrame
 ----------------------------------------------
@@ -106,56 +115,6 @@ PSK.ScrollChildren.Main = playerChild
 playerHeader:ClearAllPoints()
 playerHeader:SetPoint("TOPLEFT", playerScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Main = playerHeader
-
-----------------------------------------------
--- Dropdown List for adding a player
-----------------------------------------------
-
--- Dropdown to choose which list to add to
-local listDropdown = CreateFrame("Frame", "PSKListDropdown", PSK.AddSection, "UIDropDownMenuTemplate")
-listDropdown:SetPoint("TOPLEFT", PSK.NameInput, "BOTTOMLEFT", -15, -5)
-
-local listOptions = { "Main", "Tier" }
-PSK.SelectedList = "Main" -- default
-UIDropDownMenu_SetWidth(listDropdown, 90)
-UIDropDownMenu_Initialize(listDropdown, function(self, level)
-    for _, listName in ipairs(listOptions) do
-        local info = UIDropDownMenu_CreateInfo()
-        info.text = listName
-        info.func = function()
-            PSK.SelectedList = listName
-            UIDropDownMenu_SetText(listDropdown, listName)
-        end
-        UIDropDownMenu_AddButton(info, level)
-    end
-end)
-UIDropDownMenu_SetText(listDropdown, "Main")
-
-
-
-
---------------------------------------------------
--- Dropdown List for setting player to top/bottom
---------------------------------------------------
-
-local positionDropdown = CreateFrame("Frame", "PSKPositionDropdown", PSK.AddSection, "UIDropDownMenuTemplate")
-positionDropdown:SetPoint("LEFT", listDropdown, "RIGHT", -10, 0)
-
-local positionOptions = { "Top", "Bottom" }
-local selectedPosition = "Bottom"
-UIDropDownMenu_SetWidth(positionDropdown, 90)
-UIDropDownMenu_Initialize(positionDropdown, function(self, level)
- for _, pos in ipairs(positionOptions) do
-  local info = UIDropDownMenu_CreateInfo()
-  info.text = pos
-  info.func = function()
-   PSK.SelectedPosition = pos
-   UIDropDownMenu_SetText(positionDropdown, pos)
-  end
-  UIDropDownMenu_AddButton(info, level)
- end
-end)
-UIDropDownMenu_SetText(positionDropdown, "Bottom")
 
 
 ----------------------------------------------
@@ -310,12 +269,41 @@ lootHeader:SetText("Loot Drops")
 -- lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
 
 
+
+------------------------------------
+--  Create Manage list headers
+------------------------------------
+
+local mainHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+mainHeader:SetPoint("TOPLEFT", 10, -10)
+-- mainHeader:SetText("Available for Main List")
+
+local tierHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+tierHeader:SetPoint("TOPLEFT", 365, -10)
+-- tierHeader:SetText("Available for Tier List")
+
+-- Create the two scroll lists
+local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 10, -30, "Available Main Members", 250)
+local tierScroll, tierChild, tierFrame, tierScrollHeader = CreateBorderedScrollFrame("PSKTierAvailableScroll", PSK.ManageFrame, 365, -30, "Available Tier Members", 250)
+
+-- Store these for later updates
+PSK.ScrollFrames.MainAvailable = mainScroll
+PSK.ScrollChildren.MainAvailable = mainChild or CreateFrame("Frame", nil, mainScroll)
+PSK.Headers.MainAvailable = mainScrollHeader
+
+PSK.ScrollFrames.TierAvailable = tierScroll
+PSK.ScrollChildren.TierAvailable = tierChild or CreateFrame("Frame", nil, tierScroll)
+PSK.Headers.TierAvailable = tierScrollHeader
+
+
+
+
 ------------------------------
 -- Create Tabs for MainFrame
 ------------------------------
 
 PSK.Tabs = {}
-PanelTemplates_SetNumTabs(PSK.MainFrame, 3)
+PanelTemplates_SetNumTabs(PSK.MainFrame, 4)
 
 ------------------------------
 -- Set Tab 1 (PSK)
@@ -328,14 +316,13 @@ tab1:SetPoint("BOTTOMLEFT", PSK.MainFrame, "BOTTOMLEFT", 10, -30)
 PanelTemplates_TabResize(tab1, 0)
 PSK.Tabs[1] = tab1
 
-
 ------------------------------
--- Set Tab 2 (Loot Log)
+-- Set Tab 2 (Manage)
 ------------------------------
 
 local tab2 = CreateFrame("Button", "PSKMainFrameTab2", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab2:SetID(2)
-tab2:SetText("Settings")
+tab2:SetText("Manage")
 tab2:SetPoint("LEFT", tab1, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab2, 0)
 PSK.Tabs[2] = tab2
@@ -346,10 +333,21 @@ PSK.Tabs[2] = tab2
 
 local tab3 = CreateFrame("Button", "PSKMainFrameTab3", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab3:SetID(3)
-tab3:SetText("Logs")
+tab3:SetText("Settings")
 tab3:SetPoint("LEFT", tab2, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab3, 0)
 PSK.Tabs[3] = tab3
+
+------------------------------
+-- Set Tab 4 (Logs)
+------------------------------
+
+local tab4 = CreateFrame("Button", "PSKMainFrameTab4", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
+tab4:SetID(4)
+tab4:SetText("Logs")
+tab4:SetPoint("LEFT", tab3, "RIGHT", -16, 0)
+PanelTemplates_TabResize(tab4, 0)
+PSK.Tabs[4] = tab4
 
 ------------------------------
 -- Create Settings UI
@@ -383,7 +381,6 @@ end)
 --------------------------------
 -- Tab-switching Logic
 --------------------------------
-
 hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
     local tabID = self:GetID()
     PanelTemplates_SetTab(PSK.MainFrame, tabID)
@@ -392,15 +389,21 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
     PSK.ContentFrame:Hide()
     PSK.SettingsFrame:Hide()
     PSK.LogsFrame:Hide()
+    PSK.ManageFrame:Hide()  -- Fix: Explicitly hide the Manage tab
 
+    -- Show the selected frame
     if tabID == 1 then
         PSK.ContentFrame:Show()
     elseif tabID == 2 then
-        PSK.SettingsFrame:Show()
+        PSK.ManageFrame:Show()
+        PSK:RefreshAvailableMembers()
     elseif tabID == 3 then
+        PSK.SettingsFrame:Show()
+    elseif tabID == 4 then
         PSK.LogsFrame:Show()
     end
 end)
+
 
 ----------------------------------
 -- Sets the default selected tab
@@ -409,6 +412,10 @@ end)
 PanelTemplates_SetTab(PSK.MainFrame, 1)
 PSK.ContentFrame:Show()
 PSK.SettingsFrame:Hide()
+PSK.ManageFrame:Hide()
+PSK.LogsFrame:Hide()
+
+print("[PSK] Manage Tab Initialized")
 
 ----------------------------------
 -- Refresh lists on load
@@ -425,6 +432,8 @@ C_Timer.After(0.1, function()
 		PSK:RefreshBidList()
 		PSK:UpdateVisiblePlayerInfo()
 		PSK:UpdateLootThresholdLabel()
+		-- PSK:CreateGuildMemberDropdown()
+
     end
 end)
 

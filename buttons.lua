@@ -81,7 +81,6 @@ PSK.AddPlayerButton:SetScript("OnClick", function()
     print("|cff44ff44[PSK]|r Added " .. playerName .. " to " .. PSK.SelectedList .. " list (" .. (PSK.SelectedPosition or "Bottom") .. ").")
     
     -- Clear the input box and refresh the list
-    PSK.NameInput:SetText("")
     PSK:RefreshPlayerList()
 end)
 
@@ -90,20 +89,6 @@ end)
 ---------------------------------------------
 -- Add Player Frame
 ---------------------------------------------
-
--- Create the player name input box
-PSK.NameInput = CreateFrame("EditBox", nil, PSK.ContentFrame, "InputBoxTemplate")
-PSK.NameInput:SetSize(120, 20)
-PSK.NameInput:SetPoint("LEFT", PSK.AddPlayerButton, "RIGHT", 10, 0)
-PSK.NameInput:SetAutoFocus(false)
-PSK.NameInput:SetText("")
-
--- Optional: Clear placeholder text on focus
-PSK.NameInput:SetScript("OnEditFocusGained", function(self)
-    if self:GetText() == "" then
-        self:SetText("")
-    end
-end)
 
 
 ------------------------------

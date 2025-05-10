@@ -29,65 +29,133 @@ local CLASS_NAME_TO_FILE = {
 
 
 ---------------------------------------------------
--- Populates player data for those in db
+-- Populate the Manage scroll frames
 ---------------------------------------------------
 
--- function PSK:GetPlayerInfo()
-    -- if not IsInGuild() then return end
 
-    -- for i = 1, GetNumGuildMembers() do
-        -- local fullName, _, _, level, _, zone, _, _, online, _, classFileName = GetGuildRosterInfo(i)
-        -- local name = Ambiguate(fullName or "", "short")
-        
-        -- if name and classFileName then
-            -- PSKDB.Players = PSKDB.Players or {}
-            -- PSKDB.Players[name] = {
-                -- class = classFileName,
-                -- level = level,
-                -- zone = zone,
-                -- online = online
-            -- }
-        -- end
-    -- end
--- end
+function PSK:RefreshAvailableMembers()
+    -- Get the scroll children
+    local mainChild = PSK.ScrollChildren.MainAvailable
+    local tierChild = PSK.ScrollChildren.TierAvailable
+
+    if not mainChild or not tierChild then
+        print("[PSK] Error: MainAvailable or TierAvailable scroll frames are not initialized.")
+        return
+    end
+
+    -- Clear previous children
+    for _, child in ipairs({mainChild:GetChildren()}) do
+        child:Hide()
+        child:SetParent(nil)
+    end
+    for _, child in ipairs({tierChild:GetChildren()}) do
+        child:Hide()
+        child:SetParent(nil)
+    end
+
+    local mainList = PSKDB.MainList or {}
+    local tierList = PSKDB.TierList or {}
+    local availableMain = {}
+    local availableTier = {}
+
+    -- Populate available lists
+    for i = 1, GetNumGuildMembers() do
+        local fullName, _, _, level, _, _, _, _, online, _, classFileName = GetGuildRosterInfo(i)
+        local shortName = Ambiguate(fullName or "", "short")
+        local class = classFileName or "SHAMAN"
+
+        if level == 60 then
+            if not tContains(mainList, shortName) then
+                table.insert(availableMain, {name = shortName, online = online, class = class})
+            end
+            if not tContains(tierList, shortName) then
+                table.insert(availableTier, {name = shortName, online = online, class = class})
+            end
+        end
+    end
+
+    -- Sort lists alphabetically
+    table.sort(availableMain, function(a, b) return a.name < b.name end)
+    table.sort(availableTier, function(a, b) return a.name < b.name end)
+
+    -- Populate the Main List
+    local yOffset = -5
+    for _, player in ipairs(availableMain) do
+        local row = CreateFrame("Frame", nil, mainChild)
+        row:SetSize(320, 20)
+        row:SetPoint("TOPLEFT", 5, yOffset)
+
+        -- Add Button
+        local addButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        addButton:SetSize(20, 20)
+        addButton:SetText("+")
+        addButton:SetPoint("LEFT", row, "LEFT", 0, 0)
+        addButton:SetScript("OnClick", function()
+            table.insert(PSKDB.MainList, player.name)
+            PSK:RefreshAvailableMembers()
+            PSK:RefreshPlayerList()
+            print("[PSK] Added " .. player.name .. " to the Main List.")
+        end)
+
+        -- Class Icon
+        local classIcon = row:CreateTexture(nil, "ARTWORK")
+        classIcon:SetSize(16, 16)
+        classIcon:SetPoint("LEFT", addButton, "RIGHT", 5, 0)
+        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+        local texCoord = CLASS_ICON_TCOORDS[player.class]
+        if texCoord then
+            classIcon:SetTexCoord(unpack(texCoord))
+        end
+
+        -- Player Name
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
+        nameText:SetText(player.name)
+
+        yOffset = yOffset - 22
+    end
+
+    -- Populate the Tier List
+    yOffset = -5
+    for _, player in ipairs(availableTier) do
+        local row = CreateFrame("Frame", nil, tierChild)
+        row:SetSize(320, 20)
+        row:SetPoint("TOPLEFT", 5, yOffset)
+
+        -- Add Button
+        local addButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        addButton:SetSize(20, 20)
+        addButton:SetText("+")
+        addButton:SetPoint("LEFT", row, "LEFT", 0, 0)
+        addButton:SetScript("OnClick", function()
+            table.insert(PSKDB.TierList, player.name)
+            PSK:RefreshAvailableMembers()
+            PSK:RefreshPlayerList()
+            print("[PSK] Added " .. player.name .. " to the Tier List.")
+        end)
+
+        -- Class Icon
+        local classIcon = row:CreateTexture(nil, "ARTWORK")
+        classIcon:SetSize(16, 16)
+        classIcon:SetPoint("LEFT", addButton, "RIGHT", 5, 0)
+        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+        local texCoord = CLASS_ICON_TCOORDS[player.class]
+        if texCoord then
+            classIcon:SetTexCoord(unpack(texCoord))
+        end
+
+        -- Player Name
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
+        nameText:SetText(player.name)
+
+        yOffset = yOffset - 22
+    end
+end
 
 
----------------------------------------------------
--- Populates player data for those in db
--- Works only for players in your raid/party!!!
----------------------------------------------------
 
--- function PSK:UpdateVisiblePlayerInfo(name)
-    -- local unit = nil
 
-    -- --Try to match the name to a unit in your raid or party
-    -- if UnitExists("player") and UnitName("player") == name then
-        -- unit = "player"
-    -- else
-        -- for i = 1, GetNumGroupMembers() do
-            -- local unitID = IsInRaid() and ("raid"..i) or ("party"..i)
-            -- if UnitExists(unitID) and UnitName(unitID) == name then
-                -- unit = unitID
-                -- break
-            -- end
-        -- end
-    -- end
-
-    -- if unit then
-        -- local _, class = UnitClass(unit)
-        -- local level = UnitLevel(unit)
-        -- local zone = GetRealZoneText()
-        -- local online = not UnitIsDeadOrGhost(unit)
-
-        -- PSKDB.Players = PSKDB.Players or {}
-        -- PSKDB.Players[name] = {
-            -- class = class,
-            -- level = level,
-            -- zone = zone,
-            -- online = online
-        -- }
-    -- end
--- end
 
 function PSK:UpdateVisiblePlayerInfo(name)
     local class, level, zone, online = nil, "???", "???", false
@@ -108,7 +176,7 @@ function PSK:UpdateVisiblePlayerInfo(name)
 
     if unit then
         local localizedClass = select(2, UnitClass(unit))
-        -- class = CLASS_NAME_TO_FILE[localizedClass] or "SHAMAN"
+        class = CLASS_NAME_TO_FILE[localizedClass] or "SHAMAN"
 		local class = CLASS_NAME_TO_FILE[localizedClass] or PSKDB.Players[name] and PSKDB.Players[name].class or "SHAMAN"
         level = UnitLevel(unit)
         zone = GetRealZoneText()
