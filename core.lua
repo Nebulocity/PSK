@@ -151,18 +151,6 @@ local function IsMasterLooter()
 end
 
 
-
-----------------------------------------
--- Event Frame for Updates
-----------------------------------------
-
--- local eventFrame = CreateFrame("Frame")
--- eventFrame:RegisterEvent("PLAYER_LOGIN")
-
--- eventFrame:SetScript("OnEvent", function(self, event)
-    -- UpdatePlayerData()
--- end)
-
 ----------------------------------------
 -- Update Player Data (live)
 ----------------------------------------
@@ -300,6 +288,44 @@ function PSK:CloseBidding()
         end
     end
 end
+
+
+----------------------------------------
+-- Auto-Refresh Player Lists on Events
+----------------------------------------
+
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
+eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+eventFrame:RegisterEvent("PARTY_MEMBER_ENABLE")
+eventFrame:RegisterEvent("PARTY_MEMBER_DISABLE")
+eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+    -- Force a guild roster refresh
+    GuildRoster()
+
+    -- Update player data
+    PSK:UpdatePlayerData()
+
+    -- Refresh lists
+    if PSK and PSK.RefreshAvailableMembers then
+        PSK:RefreshAvailableMembers()
+    end
+    if PSK and PSK.RefreshPlayerList then
+        PSK:RefreshPlayerList()
+    end
+end)
+
+print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
+
+
+
 
 
 ------------------------------------------

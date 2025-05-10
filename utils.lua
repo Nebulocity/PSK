@@ -167,29 +167,6 @@ function PassPlayer()
     -- Nothing needed here -- selection will be cleared in the UI
 end
 
-----------------------------------------------
--- Gets player member info if they're level 60
-----------------------------------------------
-
--- function SavePlayerMembers()
---     if not IsInPlayer() then return end
---     wipe(PSKDB)
--- 
---     local total = GetNumPlayerMembers()
---     for i = 1, total do
---         local name, _, _, level, classFileName, _, _, _, online = PSK:GetPlayerInfo(i)
---         if name and level == 60 then
---             name = Ambiguate(name, "short")
---             local token = classFileName and string.upper(classFileName) or "UNKNOWN"
---             PSKDB[name] = {
---                 class  = token,
---                 online = online,
---                 seen   = date("%Y-%m-%d %H:%M"),
---             }
---         end
---     end
--- end
-
 
 ----------------------------------------------
 -- Announce to party/raid 
@@ -673,6 +650,68 @@ function PSK:RefreshPlayerList()
     end
 end
 
+--------------------------------------------------------
+-- Update player databases to ensure data is up to date
+--------------------------------------------------------
+function PSK:UpdatePlayerData()
+    if not PSKDB.Players then
+        PSKDB.Players = {}
+    end
+
+    for i = 1, GetNumGuildMembers() do
+        local fullName, _, _, level, _, _, _, _, online, _, classFileName = GetGuildRosterInfo(i)
+        local shortName = Ambiguate(fullName or "", "short")
+        local class = classFileName or "SHAMAN"
+
+        -- Ensure the player data is stored
+        if not PSKDB.Players[shortName] then
+            PSKDB.Players[shortName] = {
+                class = class,
+                online = online,
+                inRaid = false,
+                level = level,
+                zone = "Unknown",
+            }
+        end
+
+        -- Update online status
+        PSKDB.Players[shortName].online = online
+
+        -- Check if the player is in your current raid
+        if IsInRaid() then
+            for j = 1, GetNumGroupMembers() do
+                local unit = "raid" .. j
+                if UnitName(unit) == shortName then
+                    PSKDB.Players[shortName].inRaid = true
+                    PSKDB.Players[shortName].online = true
+                    break
+                else
+                    PSKDB.Players[shortName].inRaid = false
+                end
+            end
+        else
+            PSKDB.Players[shortName].inRaid = false
+        end
+    end
+end
+
+---------------------------------------------------
+-- Sorts the Available player lists
+---------------------------------------------------
+
+local function SortPlayers(players)
+    table.sort(players, function(a, b)
+        -- Prioritize online players first
+        if a.online and not b.online then
+            return true
+        elseif not a.online and b.online then
+            return false
+        else
+            -- Sort alphabetically if both are online or both are offline
+            return a.name < b.name
+        end
+    end)
+end
 
 ---------------------------------------------------
 -- Refresh the Available player lists
@@ -720,8 +759,10 @@ function PSK:RefreshAvailableMembers()
     end
 
     -- Sort lists alphabetically
-    table.sort(availableMain, function(a, b) return a.name < b.name end)
-    table.sort(availableTier, function(a, b) return a.name < b.name end)
+    -- table.sort(availableMain, function(a, b) return a.name < b.name end)
+    -- table.sort(availableTier, function(a, b) return a.name < b.name end)
+	SortPlayers(availableMain)
+	SortPlayers(availableTier)
 
     -- Function to add player rows
     local function AddPlayerRow(parent, player)
@@ -766,7 +807,7 @@ function PSK:RefreshAvailableMembers()
         local online = player.online
 
         -- Check if the player is in your current raid
-        if UnitInRaid("player") then
+        if IsInRaid() then
             for i = 1, GetNumGroupMembers() do
                 local unit = "raid" .. i
                 if UnitName(unit) == player.name then
@@ -791,6 +832,16 @@ function PSK:RefreshAvailableMembers()
             classIcon:SetAlpha(0.5)
         end
 
+        -- Add tooltip for more details
+        row:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:SetText(player.name, 1, 1, 1)
+            GameTooltip:AddLine("Class: " .. player.class, 0.8, 0.8, 0.8)
+            GameTooltip:AddLine("Status: " .. (inRaid and "In Raid" or (online and "Online" or "Offline")), 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", GameTooltip_Hide)
+
         yOffset = yOffset - 22
     end
 
@@ -806,6 +857,7 @@ function PSK:RefreshAvailableMembers()
         AddPlayerRow(tierChild, player)
     end
 end
+
 
 
 
