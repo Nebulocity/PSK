@@ -446,8 +446,9 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
     PSK.ContentFrame:Hide()
     PSK.SettingsFrame:Hide()
     PSK.LogsFrame:Hide()
-    PSK.ManageFrame:Hide()  -- Fix: Explicitly hide the Manage tab
-
+    PSK.ManageFrame:Hide()
+	PSK:ClearSelection()
+	
     -- Show the selected frame
     if tabID == 1 then
         PSK.ContentFrame:Show()

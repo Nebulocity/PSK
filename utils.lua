@@ -15,7 +15,7 @@ PSK.ScrollFrames = PSK.ScrollFrames or {}
 local DEFAULT_COLUMN_WIDTH = 220
 local COLUMN_HEIGHT = 355
 
-local CLASS_NAME_TO_FILE = {
+CLASS_NAME_TO_FILE = {
     ["Warrior"] = "WARRIOR",
     ["Paladin"] = "PALADIN",
     ["Hunter"]  = "HUNTER",
@@ -24,8 +24,24 @@ local CLASS_NAME_TO_FILE = {
     ["Shaman"]  = "SHAMAN",
     ["Mage"]    = "MAGE",
     ["Warlock"] = "WARLOCK",
-    ["Druid"]   = "DRUID"
+    ["Druid"]   = "DRUID",
 }
+
+RAID_CLASS_COLORS = {
+    WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
+    PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
+    HUNTER  = { r = 0.67, g = 0.83, b = 0.45 },
+    ROGUE   = { r = 1.00, g = 0.96, b = 0.41 },
+    PRIEST  = { r = 1.00, g = 1.00, b = 1.00 },
+    SHAMAN  = { r = 0.00, g = 0.44, b = 0.87 },
+    MAGE    = { r = 0.41, g = 0.80, b = 0.94 },
+    WARLOCK = { r = 0.58, g = 0.51, b = 0.79 },
+    DRUID   = { r = 1.00, g = 0.49, b = 0.04 },
+}
+
+
+
+
 
 
 ---------------------------------
@@ -118,48 +134,9 @@ function PerformAward(index)
     end
     table.insert(list, playerName)
 
-
-	-- Announce the award
-	-- local selectedItemLink = item.itemLink
-
-	-- Use GetItemInfo to ensure a fully formatted link
-	-- if item.itemID and not selectedItemLink then
-		-- local itemID = item.itemID
-		-- local fullItemName, itemLink = GetItemInfo(itemID)
-
-		-- If the item isn't cached, request it asynchronously
-		-- if not itemLink then
-			-- print("[PSK] Item not cached, attempting to request: " .. itemID)
-			-- local frame = CreateFrame("Frame")
-			-- frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-			-- frame:SetScript("OnEvent", function(self, event, receivedItemID)
-				-- if receivedItemID == itemID then
-					-- local _, resolvedLink = GetItemInfo(itemID)
-					-- if resolvedLink then
-						-- Announce(string.format("[PSK] Awarded %s to %s!", resolvedLink, coloredName))
-					-- else
-						-- print("[PSK] Error: Item still not available for ID", itemID)
-					-- end
-					-- self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-					-- self:SetScript("OnEvent", nil)
-				-- end
-			-- end)
-			-- return  -- Don't continue until the item is fully loaded
-		-- end
-
-		-- selectedItemLink = itemLink
-	-- end
-
 	-- Get class color
-	local color = RAID_CLASS_COLORS[playerClass or "PRIEST"] or { r = 1, g = 1, b = 1 }
+	local color = RAID_CLASS_COLORS[playerClass or "SHAMAN"] or { r = 1, g = 1, b = 1 }
 	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
-
-	-- Announce the award with the item link
-	-- if selectedItemLink and playerName then
-		-- Announce(string.format("[PSK] Awarded %s to %s!", selectedItemLink, coloredName))
-	-- else
-		-- print("[PSK] Error: Missing item link or player name.")
-	-- end
 
 	local itemLink = PSK.SelectedItem
 	local itemName = GetItemInfo(itemLink) or itemLink
@@ -492,7 +469,12 @@ end
 ----------------------------------------
 
 function PSK:RefreshPlayerList()
-   if not PSKDB or not PSK.CurrentList then return end
+
+    if not PSKDB or not PSK.CurrentList then return end
+	
+	-- Ensure the player data is up to date
+	PSK:UpdatePlayerData()
+
 
     local scrollChild = PSK.ScrollChildren.Main
     local header = PSK.Headers.Main
@@ -523,11 +505,8 @@ function PSK:RefreshPlayerList()
         -- Background for status glow
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints()
-        row.bg:SetColorTexture(1, 0.5, 0, 0.2)
+        row.bg:SetColorTexture(0, 0.5, 1, 0.15)  -- Light blue for selection
         row.bg:Hide()
-
-		-- PSK:UpdateVisiblePlayerInfo(name)
-
 
         -- Pull real player info
         local playerData = PSKDB.Players and PSKDB.Players[name]
@@ -536,7 +515,7 @@ function PSK:RefreshPlayerList()
         local inRaid = (playerData and playerData.inRaid) or false
         local level = (playerData and playerData.level) or "???"
         local zone = (playerData and playerData.zone) or "???"
-		local fileClass = CLASS_NAME_TO_FILE[class] or "SHAMAN"
+		-- local fileClass = CLASS_NAME_TO_FILE[class] or "SHAMAN"
 
         row.playerData = {
             class = class,
@@ -546,11 +525,6 @@ function PSK:RefreshPlayerList()
             level = level,
             zone = zone,
         }
-
-		-- Track which index the selected player ended up in
-		if PSK.SelectedPlayer == name then
-			PSK.SelectedPlayerRow = index
-		end
 
         -- Position
         local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -566,20 +540,37 @@ function PSK:RefreshPlayerList()
             classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
         end
 
-        -- Name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
-        nameText:SetText(name)
-
-        -- Click to select row
-        row:SetScript("OnClick", function()
-			PSK.SelectedPlayerRow = index
-			PSK.SelectedPlayer = name
-			PSK:HighlightSelectedPlayer()
-		end)
 
 
-        -- Status
+-- Extract the player class
+local playerClass = playerData and playerData.class or "SHAMAN"
+local fileClass = string.upper(playerClass)
+
+
+-- Corrected class color lookup
+local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
+
+-- Create the player name text with the correct color
+local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
+nameText:SetText(name)
+
+-- Apply the correct class color
+nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
+
+-- Debug print to verify the colors are correct
+print("Player Name:", name)
+print("Player Class (localized):", playerClass)
+print("File Class:", fileClass)
+print(string.format("Class Color - R: %.2f, G: %.2f, B: %.2f", classColor.r, classColor.g, classColor.b))
+
+
+
+
+
+
+
+		-- Status
         local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         statusText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
 
@@ -587,12 +578,6 @@ function PSK:RefreshPlayerList()
             statusText:SetText("In Raid")
             statusText:SetTextColor(1, 0.5, 0)
             row.bg:Show()
-            row.elapsed = 0
-            row:SetScript("OnUpdate", function(self, elapsed)
-                self.elapsed = (self.elapsed or 0) + elapsed
-                local alpha = 0.2 + 0.1 * math.sin(self.elapsed * 3)
-                self.bg:SetAlpha(alpha)
-            end)
         elseif online then
             statusText:SetText("Online")
             statusText:SetTextColor(0, 1, 0)
@@ -605,12 +590,80 @@ function PSK:RefreshPlayerList()
             classIcon:SetAlpha(0.5)
         end
 
+        -- Click to select row
+        row:SetScript("OnClick", function()
+            PSK.SelectedPlayerRow = index
+            PSK.SelectedPlayer = name
+            PSK:RefreshPlayerList()
+        end)
+
+        -- Highlight the selected row
+        if PSK.SelectedPlayer == name then
+            row.bg:Show()
+
+            -- Add Up Arrow with Flash Animation
+			local upButton = CreateFrame("Button", nil, row)
+			upButton:SetSize(24, 24)
+			upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
+			upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+			upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+			upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+
+			upButton:SetScript("OnClick", function()
+				if index > 1 then
+					local movedName = table.remove(names, index)
+					table.insert(names, index - 1, movedName)
+					PSK.SelectedPlayer = movedName
+					PSK.SelectedPlayerRow = index - 1
+					PSK:RefreshPlayerList()
+
+					-- Flash effect
+					row.bg:SetColorTexture(0.2, 0.8, 0.2, 0.4)
+					C_Timer.After(0.1, function()
+						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
+					end)
+
+					-- Play sound
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end
+			end)
+
+
+            -- Add Down Arrow with Flash Animation
+			local downButton = CreateFrame("Button", nil, row)
+			downButton:SetSize(24, 24)
+			downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+			downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+			downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+			downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+
+			downButton:SetScript("OnClick", function()
+				if index < #names then
+					local movedName = table.remove(names, index)
+					table.insert(names, index + 1, movedName)
+					PSK.SelectedPlayer = movedName
+					PSK.SelectedPlayerRow = index + 1
+					PSK:RefreshPlayerList()
+
+					-- Flash effect
+					row.bg:SetColorTexture(0.8, 0.2, 0.2, 0.4)
+					C_Timer.After(0.1, function()
+						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
+					end)
+
+					-- Play sound
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end
+			end)
+
+        end
+
         -- Tooltip
         row:SetScript("OnEnter", function(self)
             if self.playerData then
-                GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:ClearLines()
-                local tcoords = CLASS_ICON_TCOORDS[self.playerData.class or "WARRIOR"]
+                local tcoords = CLASS_ICON_TCOORDS[class]
                 if tcoords then
                     local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
                         tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
@@ -626,62 +679,10 @@ function PSK:RefreshPlayerList()
         end)
         row:SetScript("OnLeave", GameTooltip_Hide)
 
-        -- If selected row, show up/down buttons
-        if PSK.SelectedPlayerRow == index then
-            local upButton = CreateFrame("Button", nil, row)
-            upButton:SetSize(24, 24)
-            upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
-            upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-            upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
-            upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
-			
-			upButton:SetScript("OnEnter", function()
-			  GameTooltip:SetOwner(upButton, "ANCHOR_RIGHT")
-			  GameTooltip:SetText("Move Player Up", 1, 1, 1)
-			  GameTooltip:Show()
-			end)
-			upButton:SetScript("OnLeave", GameTooltip_Hide)
-
-
-            upButton:SetScript("OnClick", function()
-                if index > 1 then
-					local movedName = names[index]
-					table.insert(names, index - 1, table.remove(names, index))
-					PSK.SelectedPlayer = movedName
-					PSK:RefreshPlayerList()
-				end
-            end)
-
-            local downButton = CreateFrame("Button", nil, row)
-            downButton:SetSize(24, 24)
-            downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-            downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-            downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
-            downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
-			
-			downButton:SetScript("OnEnter", function()
-			  GameTooltip:SetOwner(downButton, "ANCHOR_RIGHT")
-			  GameTooltip:SetText("Move Player Down", 1, 1, 1)
-			  GameTooltip:Show()
-			end)
-			downButton:SetScript("OnLeave", GameTooltip_Hide)
-			
-			
-            downButton:SetScript("OnClick", function()
-                if index < #names then
-					local movedName = names[index]
-					table.insert(names, index + 1, table.remove(names, index))
-					PSK.SelectedPlayer = movedName
-					PSK:RefreshPlayerList()
-				end
-            end)		
-        end
-
-		PSK:HighlightSelectedPlayer()
-
         yOffset = yOffset - 22
     end
 end
+
 
 --------------------------------------------------------
 -- Update player databases to ensure data is up to date
@@ -727,6 +728,8 @@ function PSK:UpdatePlayerData()
         end
     end
 end
+
+
 
 ---------------------------------------------------
 -- Sorts the Available player lists

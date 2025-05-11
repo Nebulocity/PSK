@@ -408,6 +408,17 @@ function RetractBid(name)
 end
 
 
+--------------------------------------------------------------
+-- Clear the player selection when switching main/tier lists
+--------------------------------------------------------------
+
+function PSK:ClearSelection()
+    PSK.SelectedPlayer = nil
+    PSK.SelectedPlayerRow = nil
+    PSK:RefreshPlayerList()
+end
+
+
 ------------------------------------------
 -- Console commands to open addon
 ------------------------------------------

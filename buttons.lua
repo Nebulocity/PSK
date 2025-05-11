@@ -33,6 +33,7 @@ PSK.ToggleListButton:SetScript("OnClick", function()
 
     PSK:RefreshPlayerList()
     PSK:RefreshBidList()
+	PSK:ClearSelection()
 end)
 
 
