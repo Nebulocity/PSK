@@ -84,13 +84,15 @@ function PerformAward(index)
     local playerName = playerEntry and playerEntry.name
     local playerClass = playerEntry and playerEntry.class
     local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
-    local item = PSKGlobal.LootDrops[index] -- use this as the main item table
+    
+	-- Use the selected item instead of relying on index
+	local item = PSK.SelectedItemData
 
-    -- Defensive fallback
-    if not item then
-        print("[PSK] Error: No loot item found at index", index)
-        return
-    end
+	-- Defensive fallback
+	if not item then
+		print("[PSK] Error: No selected item found for award")
+		return
+	end
 
     -- Animate selected loot row fading out
     if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
@@ -132,6 +134,7 @@ function PerformAward(index)
             break
         end
     end
+	
     table.insert(list, playerName)
 
 	-- Get class color
@@ -243,8 +246,6 @@ function PSK:RefreshLootList()
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
-
-    print("[PSK DEBUG] Refreshing Global Loot List. LootDrops count:", #PSKGlobal.LootDrops)
 
     -- Clear previous children
     for _, child in ipairs({scrollChild:GetChildren()}) do
@@ -406,11 +407,18 @@ function PSK:RefreshLogList()
 			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 		end
 
+		-- Player Name
+		local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		playerText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
 
-        -- Player Name
-        local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        playerText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
-        playerText:SetText(log.player)
+		-- Get the correct class color
+		local playerClass = log.class and log.class:upper() or "SHAMAN"
+		local classColor = RAID_CLASS_COLORS[playerClass] or { r = 1, g = 1, b = 1 }
+
+		-- Apply the color to the player name
+		playerText:SetText(log.player)
+		playerText:SetTextColor(classColor.r, classColor.g, classColor.b)
+
 
 		-- Get the item texture if it wasn't recorded earlier.
 		if not log.itemTexture and log.itemLink then
@@ -540,35 +548,20 @@ function PSK:RefreshPlayerList()
             classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
         end
 
+		-- Extract the player class
+		local playerClass = playerData and playerData.class or "SHAMAN"
+		local fileClass = string.upper(playerClass)
 
+		-- Corrected class color lookup
+		local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
 
--- Extract the player class
-local playerClass = playerData and playerData.class or "SHAMAN"
-local fileClass = string.upper(playerClass)
+		-- Create the player name text with the correct color
+		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
+		nameText:SetText(name)
 
-
--- Corrected class color lookup
-local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
-
--- Create the player name text with the correct color
-local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
-nameText:SetText(name)
-
--- Apply the correct class color
-nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
-
--- Debug print to verify the colors are correct
-print("Player Name:", name)
-print("Player Class (localized):", playerClass)
-print("File Class:", fileClass)
-print(string.format("Class Color - R: %.2f, G: %.2f, B: %.2f", classColor.r, classColor.g, classColor.b))
-
-
-
-
-
-
+		-- Apply the correct class color
+		nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
 
 		-- Status
         local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -795,8 +788,6 @@ function PSK:RefreshAvailableMembers()
     end
 
     -- Sort lists alphabetically
-    -- table.sort(availableMain, function(a, b) return a.name < b.name end)
-    -- table.sort(availableTier, function(a, b) return a.name < b.name end)
 	SortPlayers(availableMain)
 	SortPlayers(availableTier)
 
@@ -830,10 +821,20 @@ function PSK:RefreshAvailableMembers()
         end
 
         -- Player Name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
-        nameText:SetText(player.name)
+        -- local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        -- nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
+        -- nameText:SetText(player.name)
+		-- Player Name with Class Color
+		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
 
+		-- Correct class color lookup
+		local playerClass = player.class:upper()
+		local classColor = RAID_CLASS_COLORS[playerClass] or { r = 1, g = 1, b = 1 }
+		nameText:SetText(player.name)
+		nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
+	
+	
         -- Player Status
         local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         statusText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
