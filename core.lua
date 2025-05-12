@@ -5,36 +5,24 @@ local PSK = select(2, ...)
 
 -- Ensure PSKDB is initialized correctly
 if not PSKDB then PSKDB = {} end
+if not PSKDB.Settings then PSKDB.Settings = {} end
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
 if not PSKDB.Players then PSKDB.Players = {} end
+if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
 
 _G.PSKGlobal = _G.PSKGlobal or {}
-
--- Use the persistent loot drop list
 PSKGlobal.LootDrops = PSKGlobal.LootDrops or {}
 PSK.LootDrops = PSKGlobal.LootDrops
 
--- Also initialize logs etc
-PSKDB.LootLogs = PSKDB.LootLogs or {}
+-- Copy settings to table
+PSK.Settings = CopyTable(PSKDB.Settings)
 
-
--- For Tracking
-PSKDB = PSKDB or {}             
-if not PSKDB.MainList then PSKDB.MainList = {} end
-if not PSKDB.TierList then PSKDB.TierList = {} end
-
-
-local threshold = (PSK.Settings and PSK.Settings.lootThreshold) or 3
-
-if rarity and rarity > threshold then
-    -- add to loot
+-- Set default loot threshold if not present
+if not PSKDB.Settings.lootThreshold then
+    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or GetLootThreshold() or 3
+	PSKDB.Settings.lootThreshold = PSK.Settings.lootThreshold
 end
-
-
-BiddingOpen = false
-PSK.BidEntries = {}
-PSK.CurrentList = "Main"
 
 -- Main Variables
 BiddingOpen = false
@@ -68,123 +56,83 @@ end
 
 
 ----------------------------------------
--- Record Loot
+-- Record Loot (Only Your Own)
 ----------------------------------------
 
 local lootFrame = CreateFrame("Frame") 
 lootFrame:RegisterEvent("CHAT_MSG_LOOT")
 
 lootFrame:SetScript("OnEvent", function(self, event, msg)
-    if PSK.LootRecordingActive then
-        local player, itemLink = msg:match("([^%s]+) receives loot: (.+)")
-        if not itemLink then
-            itemLink = msg:match("You receive loot: (.+)")
-            player = UnitName("player")
-        end
+    if not PSK.LootRecordingActive then return end
 
-        if itemLink then
-            print("[PSK DEBUG] Loot message matched. Player:", player, "Item:", itemLink)
+    -- Check if the loot message is for the player
+    local playerName = UnitName("player")
+    local youLooted = msg:match("You receive loot: (.+)")
+    local playerLooted, itemLink = msg:match("^([^%s]+) receives loot: (.+)")
 
-            C_Timer.After(0.2, function()
-                local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
-                local threshold = PSK.Settings.lootThreshold or 3
+    -- Ignore messages that are not the current player
+    if playerLooted and playerLooted ~= playerName then
+        return
+    end
 
-                print("[PSK DEBUG] Item:", itemName or "nil", "Rarity:", rarity or "nil", "Threshold:", threshold)
+    -- Use the correct item link based on the message
+    itemLink = itemLink or youLooted
 
-                if rarity and rarity >= threshold then
-                    print("[PSK DEBUG] Rarity is sufficient, logging loot.")
+    -- Process the item if it's valid
+    if itemLink then
+        C_Timer.After(0.2, function()
+            local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
+            local threshold = PSK.Settings.lootThreshold or 3
 
-                    if not PSKDB.LootDrops then PSKDB.LootDrops = {} end
+            -- Only record items that meet the threshold
+            if rarity and rarity >= threshold then
+                local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
 
-					-- table.insert(PSK.LootDrops, {
-						-- itemLink = itemLink,
-						-- itemTexture = icon
-					-- })
+                table.insert(PSKGlobal.LootDrops, {
+                    itemLink = itemLink,
+                    itemTexture = icon,
+                    player = playerName,
+                    class = class,
+                    timestamp = date("%I:%M %p %m/%d/%Y")
+                })
 
-					if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
-                    local class = PSKDB.Players[player] and PSKDB.Players[player].class or "SHAMAN"
-					
-					table.insert(PSKGlobal.LootDrops, {
-						itemLink = itemLink,
-						itemTexture = icon,
-						player = player,
-						class = class,
-						timestamp = date("%I:%M %p %m/%d/%Y")
-					})
+                PSK:RefreshLootList()
 
-
-                    PSK:RefreshLootList()
-
-                    
-					
-					local hour, minute = GetGameTime()
-					local ampm = (hour >= 12) and "PM" or "AM"
-					hour = (hour % 12 == 0) and 12 or (hour % 12)
-					local timeString = string.format("%d:%02d%s", hour, minute, ampm)
-					local dateString = date("%m/%d/%Y")  -- still uses system date
-					local fullTimestamp = timeString .. " " .. dateString
-					timestamp = fullTimestamp
-
-
-                    if PSK.RefreshLogList then
-                        PSK:RefreshLogList()
-                    end
-                else
-                    print("[PSK DEBUG] Rarity not high enough or unknown. Skipping log.")
+                if PSK.RefreshLogList then
+                    PSK:RefreshLogList()
                 end
-            end)
-        end
+
+                print("[PSK] Loot recorded: " .. itemLink .. " (" .. playerName .. ")")
+            end
+        end)
     end
 end)
 
 
 
 
+--------------------------------------------------------------------
+-- Listen for loot method changes, which includes threshold changes
+--------------------------------------------------------------------
 
-----------------------------------------
--- Only Record for Master Looter
-----------------------------------------
+local thresholdFrame = CreateFrame("Frame")
+thresholdFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
+-- thresholdFrame:RegisterEvent("LOOT_THRESHOLD_CHANGED")
+thresholdFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "PARTY_LOOT_METHOD_CHANGED" then
+        local newThreshold = GetLootThreshold() or 3
 
-local function IsMasterLooter()
-	-- local lootMethod = GetLootMethod()
-	return lootMethod == "master"
-end
+        -- Update PSK settings
+        PSK.Settings.lootThreshold = newThreshold
+        PSKDB.Settings.lootThreshold = newThreshold
 
+        -- Update the UI label
+        if PSK.UpdateLootThresholdLabel then
+            PSK:UpdateLootThresholdLabel()
+        end
+    end
+end)
 
-----------------------------------------
--- Update Player Data (live)
-----------------------------------------
-
--- function UpdatePlayerData()
-    -- if not IsInPlayer() then return end
-
-    -- PlayerRoster()
-
-    -- if not PSKDB.Players then
-        -- PSKDB.Players = {}
-    -- end
-
-    -- for i = 1, GetNumPlayerMembers() do
-        -- local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetPlayerRosterInfo(i)
-
-        -- if name then
-            -- name = Ambiguate(name, "none") -- Remove realm name if needed
-            -- if not PSKDB.Players[name] then
-                -- PSKDB.Players[name] = {}
-            -- end
-
-            -- PSKDB.Players[name].class = classFileName
-            -- PSKDB.Players[name].online = online
-            -- PSKDB.Players[name].inRaid = UnitInRaid(name) ~= nil
-			-- PSKDB.Players[name].level = level
-			-- PSKDB.Players[name].zone = zone
-        -- end
-    -- end
-
-    -- Refresh displays
-    -- PSK:RefreshPlayerList()
-    -- PSK:RefreshBidList()
- -- end
 
 ----------------------------------------
 -- Bidding System 
@@ -225,13 +173,14 @@ function PSK:StartBidding()
 	
     -- Use the full item link for clickable text
     Announce("[PSK] Bidding has started for " .. itemLink .. "! 15 seconds remaining.")
-	Announce("[PSK] Type 'bid' or 'retract' to place/remove a bid.")
+	Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
+	Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
 	Announce("[PSK] -----------------------------------------------------------------")
 
     -- Countdown Messages
-    local countdownTimes = {15, 10, 5, 4, 3, 2, 1}
+    local countdownTimes = {20, 15, 10, 5, 4, 3, 2, 1}
     for _, seconds in ipairs(countdownTimes) do
-        C_Timer.After(15 - seconds, function()
+        C_Timer.After(20 - seconds, function()
             if BiddingOpen then
                 Announce("[PSK] " .. seconds .. " seconds left to bid on " .. itemLink .. "!")
             end
@@ -457,30 +406,30 @@ end)
 -- Console command to export lists
 ------------------------------------------
 
-SLASH_PSKEXPORT1 = "/pskexport"
-SlashCmdList["PSKEXPORT"] = function(msg)
-    msg = msg and msg:lower():gsub("^%s+", "") or ""
+-- SLASH_PSKEXPORT1 = "/pskexport"
+-- SlashCmdList["PSKEXPORT"] = function(msg)
+    -- msg = msg and msg:lower():gsub("^%s+", "") or ""
 
-    if msg == "all" then
-        PSK:ExportList("Main")
-        PSK:ExportList("Tier")
-    else
-        PSK:ExportList(PSK.CurrentList or "Main")
-    end
-end
+    -- if msg == "all" then
+        -- PSK:ExportList("Main")
+        -- PSK:ExportList("Tier")
+    -- else
+        -- PSK:ExportList(PSK.CurrentList or "Main")
+    -- end
+-- end
 
 
-function PSK:ExportList(listType)
-    local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
+-- function PSK:ExportList(listType)
+    -- local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
 
-    if #list == 0 then
-        print("[PSK] " .. listType .. " list is empty.")
-        return
-    end
+    -- if #list == 0 then
+        -- print("[PSK] " .. listType .. " list is empty.")
+        -- return
+    -- end
 
-    local exportLine = table.concat(list, ", ")
-    PSK:ShowExportWindow(exportLine)
-end
+    -- local exportLine = table.concat(list, ", ")
+    -- PSK:ShowExportWindow(exportLine)
+-- end
 
 ------------------------------------------
 -- Console command to print command help

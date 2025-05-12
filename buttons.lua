@@ -108,10 +108,10 @@ end)
 PSK.LootLabel = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 PSK.LootLabel:SetPoint("RIGHT", PSK.ClearLootButton, "LEFT", -5, -1)
 local threshold = PSK.Settings.lootThreshold or 3
-local color =  PSK.RarityColors[threshold] or "ffffff"
+local color = PSK.RarityColors[threshold] or "ffffff"
 local name = PSK.RarityNames[threshold] or "Rare"
 
-PSK.LootLabel:SetText("|cff" .. color .. "(" .. name .. "0" .. "+|r")
+PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
 
 
 ------------------------------

@@ -40,10 +40,6 @@ RAID_CLASS_COLORS = {
 }
 
 
-
-
-
-
 ---------------------------------
 -- Award loot to selected player
 ---------------------------------
@@ -478,6 +474,12 @@ end
 
 function PSK:RefreshPlayerList()
 
+	if InCombatLockdown() then
+        print("[PSK] Cannot update player list during combat. Update will be delayed.")
+        PSK:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+	
     if not PSKDB or not PSK.CurrentList then return end
 	
 	-- Ensure the player data is up to date
@@ -648,7 +650,6 @@ function PSK:RefreshPlayerList()
 					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 				end
 			end)
-
         end
 
         -- Tooltip
@@ -722,6 +723,27 @@ function PSK:UpdatePlayerData()
     end
 end
 
+
+
+---------------------------------------------------
+-- Handle delayed refresh after combat
+---------------------------------------------------
+-- Create a dedicated event frame for combat-related events
+if not PSK.EventFrame then
+    PSK.EventFrame = CreateFrame("Frame")
+end
+
+-- Register the event
+PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+
+-- Handle the event
+PSK.EventFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        PSK:RefreshPlayerList()
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        print("[PSK] Player list updated after combat.")
+    end
+end)
 
 
 ---------------------------------------------------
@@ -1147,20 +1169,102 @@ end
 -- Update the Loot Threshold On Change
 -------------------------------------------
 
-function PSK:UpdateLootThresholdLabel()
+function PSK:UpdateLootThresholdLabel(newThreshold)
     if not PSK.LootLabel then return end
 
-	local threshold = GetLootThreshold() or 2 -- fallback to Uncommon
-    -- local threshold = PSK.Settings.lootThreshold or 3
-    local color = PSK.RarityColors[threshold] or "ffffff"
-    local name = PSK.RarityNames[threshold] or "Rare"
+    -- Use the provided threshold, or default to the current settings
+    local threshold = newThreshold or PSK.Settings.lootThreshold or 3
 
+    -- Update the settings
+    PSK.Settings.lootThreshold = threshold
+    PSKDB.Settings.lootThreshold = threshold
+
+    -- Get the name and color for the threshold
+    local name = PSK.RarityNames[threshold] or "Rare"
+    local color = PSK.RarityColors[threshold] or "ffffff"
+
+    -- Update the label
     PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
 end
 
 
-if PSK.RefreshLootList then
-    PSK:RefreshLootList()
+--------------------------------------------
+-- Add Import/Export Section to Settings Tab
+--------------------------------------------
+
+function PSK:CreateImportExportSection()
+    -- Create Import/Export frame
+    local importExportFrame = CreateFrame("Frame", "PSKImportExportFrame", PSK.SettingsFrame)
+    importExportFrame:SetSize(600, 300)
+    importExportFrame:SetPoint("TOPLEFT", PSK.SettingsFrame, "TOPLEFT", 20, -300)
+
+    -- Title
+    local title = importExportFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, 0)
+    title:SetText("Import/Export Player Lists")
+
+    -- Scroll Frame
+    local scrollFrame = CreateFrame("ScrollFrame", "PSKImportExportScrollFrame", importExportFrame, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetSize(580, 200)
+    scrollFrame:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, -40)
+
+    -- Edit Box
+    local editBox = CreateFrame("EditBox", "PSKImportExportEditBox", scrollFrame)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject(GameFontHighlight)
+    editBox:SetWidth(560) -- Match the inner width of the scroll frame
+    editBox:SetAutoFocus(false)
+    editBox:SetTextInsets(10, 10, 10, 10)
+    editBox:SetMaxLetters(10000)
+
+    scrollFrame:SetScrollChild(editBox)
+
+    -- Add the OnVerticalScroll handler
+    scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
+        self:SetVerticalScroll(offset)
+    end)
+
+    -- Import Button
+    local importButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
+    importButton:SetSize(120, 30)
+    importButton:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMLEFT", 0, -40)
+    importButton:SetText("Import")
+    importButton:SetScript("OnClick", function()
+        local text = editBox:GetText()
+        PSK:ImportLists(text)
+        editBox:SetText("")
+        print("[PSK] Lists Imported Successfully")
+    end)
+
+    -- Export Button
+    local exportButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
+    exportButton:SetSize(120, 30)
+    exportButton:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, -40)
+    exportButton:SetText("Export")
+    exportButton:SetScript("OnClick", function()
+        local exportedText = PSK:ExportLists()
+        editBox:SetText(exportedText)
+        editBox:HighlightText()
+        editBox:SetFocus()
+        print("[PSK] Lists Exported Successfully")
+    end)
+
+    PSK.ImportExportFrame = importExportFrame
 end
+
+
+function PSK:ExportLists()
+    local function formatList(list)
+        return table.concat(list, ",")
+    end
+    
+    local mainList = formatList(PSKDB.MainList or {})
+    local tierList = formatList(PSKDB.TierList or {})
+    
+    local exportText = "Main List:\n" .. mainList .. "\n\nTier List:\n" .. tierList
+    return exportText
+end
+
+
 
 PSK:RefreshLogList()

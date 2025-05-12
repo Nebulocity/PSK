@@ -100,6 +100,24 @@ PSK.ManageFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
 PSK.ManageFrame:Hide()
 
 
+------------------------
+-- Export Frame (settings tab)
+------------------------
+
+local exportButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportButton:SetSize(120, 30)
+exportButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", 0, -40)
+exportButton:SetText("Export")
+exportButton:SetScript("OnClick", function()
+    local exportedText = PSK:ExportLists()
+    PSK.PSKImportExportEditBox:SetText(exportedText)
+    PSK.PSKImportExportEditBox:HighlightText()
+    PSK.PSKImportExportEditBox:SetFocus()
+    print("[PSK] Lists Exported Successfully")
+end)
+
+
+
 ---------------------------------------------
 -- Set the default selected list (main/tier)
 ---------------------------------------------
@@ -475,23 +493,27 @@ PSK.LogsFrame:Hide()
 
 print("[PSK] Manage Tab Initialized")
 
+
+
+
+
+
+
+
+
+
 ----------------------------------
 -- Refresh lists on load
 ----------------------------------
 
-
-
--- Timed refresh to ensure logs/loot lists are ready on player login
 C_Timer.After(0.1, function()
     if PSK.RefreshLogList then
-        PSK:RefreshLogList()
+        PSK:UpdateLootThresholdLabel()
+		-- PSK:CreateImportExportSection()
+		PSK:RefreshLogList()
 		PSK:RefreshLootList()
 		PSK:RefreshPlayerList()
 		PSK:RefreshBidList()
-		-- PSK:UpdateVisiblePlayerInfo()
-		PSK:UpdateLootThresholdLabel()
-		-- PSK:CreateGuildMemberDropdown()
-
     end
 end)
 
