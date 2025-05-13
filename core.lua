@@ -56,57 +56,114 @@ end
 
 
 ----------------------------------------
--- Record Loot (Only Your Own)
+-- Record Loot 
 ----------------------------------------
 
-local lootFrame = CreateFrame("Frame") 
-lootFrame:RegisterEvent("CHAT_MSG_LOOT")
+----------------------------------------
+-- Event frame for loot master looting
+----------------------------------------
 
-lootFrame:SetScript("OnEvent", function(self, event, msg)
+local lootViewFrame = CreateFrame("Frame")
+lootViewFrame:RegisterEvent("LOOT_OPENED")
+
+lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
     if not PSK.LootRecordingActive then return end
+	
+    --if not IsMasterLooter() then return end  -- Only record if you're the ML
+
+	local numItems = GetNumLootItems()
+	local lootLinks = {}
+
+	for i = 1, numItems do
+		if LootSlotHasItem(i) then
+			local itemLink = GetLootSlotLink(i)
+			if itemLink then
+				table.insert(lootLinks, itemLink)
+
+				C_Timer.After(0.1, function()
+					local name, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
+					local threshold = PSK.Settings.lootThreshold or 3
+					if rarity and rarity >= threshold then
+						local playerName = UnitName("player")
+						local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
+
+						table.insert(PSKGlobal.LootDrops, {
+							itemLink = itemLink,
+							itemTexture = icon,
+							player = playerName,
+							class = class,
+							timestamp = date("%I:%M %p %m/%d/%Y")
+						})
+
+						PSK:RefreshLootList()
+						if PSK.RefreshLogList then
+							PSK:RefreshLogList()
+						end
+
+						print("[PSK] Master Looter viewed loot: " .. itemLink)
+					end
+				end)
+			end
+		end
+	end
+
+	-- Announce loot bag contents
+	if #lootLinks > 0 then
+		local message = "[PSK] Loot Bag: " .. table.concat(lootLinks, ", ")
+		Announce(message)
+	end
+
+end)
+
+
+-- local lootFrame = CreateFrame("Frame") 
+-- lootFrame:RegisterEvent("CHAT_MSG_LOOT")
+
+-- lootFrame:SetScript("OnEvent", function(self, event, msg)
+    -- if not PSK.LootRecordingActive then return end
 
     -- Check if the loot message is for the player
-    local playerName = UnitName("player")
-    local youLooted = msg:match("You receive loot: (.+)")
-    local playerLooted, itemLink = msg:match("^([^%s]+) receives loot: (.+)")
+    -- local playerName = UnitName("player")
+    -- local youLooted = msg:match("You receive loot: (.+)")
+    -- local playerLooted, itemLink = msg:match("^([^%s]+) receives loot: (.+)")
 
     -- Ignore messages that are not the current player
-    if playerLooted and playerLooted ~= playerName then
-        return
-    end
+    -- if playerLooted and playerLooted ~= playerName then
+        -- return
+    -- end
 
     -- Use the correct item link based on the message
-    itemLink = itemLink or youLooted
+    -- itemLink = itemLink or youLooted
 
     -- Process the item if it's valid
-    if itemLink then
-        C_Timer.After(0.2, function()
-            local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
-            local threshold = PSK.Settings.lootThreshold or 3
+    -- if itemLink then
+        -- C_Timer.After(0.2, function()
+            -- local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
+            -- local threshold = PSK.Settings.lootThreshold or 3
 
             -- Only record items that meet the threshold
-            if rarity and rarity >= threshold then
-                local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
+            -- if rarity and rarity >= threshold then
+                -- local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
 
-                table.insert(PSKGlobal.LootDrops, {
-                    itemLink = itemLink,
-                    itemTexture = icon,
-                    player = playerName,
-                    class = class,
-                    timestamp = date("%I:%M %p %m/%d/%Y")
-                })
+                -- table.insert(PSKGlobal.LootDrops, {
+                    -- itemLink = itemLink,
+                    -- itemTexture = icon,
+                    -- player = playerName,
+                    -- class = class,
+                    -- timestamp = date("%I:%M %p %m/%d/%Y")
+                -- })
 
-                PSK:RefreshLootList()
+                -- PSK:RefreshLootList()
 
-                if PSK.RefreshLogList then
-                    PSK:RefreshLogList()
-                end
+                -- if PSK.RefreshLogList then
+                    -- PSK:RefreshLogList()
+                -- end
 
-                print("[PSK] Loot recorded: " .. itemLink .. " (" .. playerName .. ")")
-            end
-        end)
-    end
-end)
+                -- print("[PSK] Loot recorded: " .. itemLink .. " (" .. playerName .. ")")
+            -- end
+        -- end)
+    -- end
+-- end)
 
 
 
@@ -208,12 +265,11 @@ function PSK:CloseBidding()
     else
         Announce("[PSK] Bidding closed. Bidders:")
         for _, entry in ipairs(PSK.BidEntries) do
-            local line = string.format("%d. %s", entry.position, entry.name)
+            local line = string.format("[PSK] %d. %s", entry.position, entry.name)
             Announce(line)
         end
     end
 end
-
 
 ----------------------------------------
 -- Auto-Refresh Player Lists on Events

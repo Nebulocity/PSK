@@ -475,9 +475,12 @@ end
 function PSK:RefreshPlayerList()
 
 	if InCombatLockdown() then
-        PSK:RegisterEvent("PLAYER_REGEN_ENABLED")
-        return
-    end
+		if PSK.EventFrame and PSK.EventFrame.RegisterEvent then
+			PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+		return
+	end
+
 	
     if not PSKDB or not PSK.CurrentList then return end
 	
@@ -544,10 +547,20 @@ function PSK:RefreshPlayerList()
         local classIcon = row:CreateTexture(nil, "ARTWORK")
         classIcon:SetSize(16, 16)
         classIcon:SetPoint("LEFT", posText, "RIGHT", 8, 0)
-        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-        if CLASS_ICON_TCOORDS[class] then
-            classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
-        end
+		
+        -- classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+        -- if CLASS_ICON_TCOORDS[class] then
+            -- classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+        -- end
+		if CLASS_ICON_TCOORDS[class] then
+			classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+			classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+		else
+			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			classIcon:SetTexCoord(0, 1, 0, 1)
+		end
+
+
 
 		-- Extract the player class
 		local playerClass = playerData and playerData.class or "SHAMAN"
@@ -1321,7 +1334,6 @@ function PSK:RefreshGroupMemberData()
                 inRaid = inRaid,
             }
 
-            print("[PSK] Updated data for " .. name .. " from party/raid info.")
             PSK:RefreshPlayerList()
         end
     end
