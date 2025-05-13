@@ -99,58 +99,224 @@ PSK.ManageFrame:SetBackdrop({
 PSK.ManageFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
 PSK.ManageFrame:Hide()
 
+------------------------------
+-- Import/Export Frame (Tab)
+------------------------------
 
-------------------------
--- Export Frame (settings tab)
-------------------------
+PSK.ImportExportFrame = CreateFrame("Frame", "PSKImportExportFrame", PSK.MainFrame, "BackdropTemplate")
+PSK.ImportExportFrame:SetPoint("TOPLEFT", 8, -28)
+PSK.ImportExportFrame:SetPoint("BOTTOMRIGHT", -6, 8)
+PSK.ImportExportFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+PSK.ImportExportFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.85)
+PSK.ImportExportFrame:Hide()
 
--- Create Import/Export Frame in Settings Tab
-local importExportFrame = CreateFrame("Frame", "PSKImportExportFrame", PSK.SettingsFrame)
-importExportFrame:SetSize(600, 300)
-importExportFrame:SetPoint("TOPLEFT", 20, -150)
 
--- Title
-local importExportTitle = importExportFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-importExportTitle:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, 0)
-importExportTitle:SetText("Import / Export Lists")
+------------------------------
+-- Import/Export Frames
+------------------------------
 
--- Edit Box for Import/Export
-local importExportEditBox = CreateFrame("EditBox", "PSKImportExportEditBox", importExportFrame, "InputScrollFrameTemplate")
-importExportEditBox:SetSize(580, 200)
-importExportEditBox:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, -40)
-importExportEditBox:SetFontObject(GameFontHighlight)
-importExportEditBox:SetMultiLine(true)
-importExportEditBox:SetAutoFocus(false)
-importExportEditBox:SetTextInsets(10, 10, 10, 10)
-importExportEditBox:SetMaxLetters(10000)
-importExportEditBox:ClearFocus()
+-- Path to your custom parchment texture
+local parchmentTexture = "Interface\\AddOns\\PSK\\Media\\parchment.png"
 
-PSK.PSKImportExportEditBox = importExportEditBox
 
+------------------------------
+-- Create Main List Frame
+------------------------------
+
+local mainListFrame = CreateFrame("Frame", "PSKMainListFrame", PSK.ImportExportFrame, "BackdropTemplate")
+mainListFrame:SetPoint("TOPLEFT", 20, -60)
+mainListFrame:SetSize(300, 340)
+mainListFrame:SetBackdrop({
+    bgFile = "Interface\\ACHIEVEMENTFRAME\\UI-Achievement-Parchment-Horizontal",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 256, edgeSize = 16,
+    insets = { left = 8, right = 8, top = 8, bottom = 8 },
+})
+mainListFrame:SetBackdropColor(1, 1, 1, 0.9)
+
+-- Create Main List Title
+local mainListTitle = mainListFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+mainListTitle:SetPoint("TOP", 0, -10)
+mainListTitle:SetText("Main List")
+
+-- Create Main List Scroll Frame
+local mainScrollFrame = CreateFrame("ScrollFrame", "PSKMainListScrollFrame", mainListFrame, "UIPanelScrollFrameTemplate")
+mainScrollFrame:SetPoint("TOPLEFT", 10, -40)
+mainScrollFrame:SetSize(280, 280)
+
+
+-- Create Main List Edit Box
+local mainEditBox = CreateFrame("EditBox", "PSKMainListEditBox", mainScrollFrame, "BackdropTemplate")
+mainEditBox:SetMultiLine(true)
+mainEditBox:SetFontObject(GameFontHighlight)
+mainEditBox:SetAutoFocus(false)
+mainEditBox:SetSize(280, 280)
+mainEditBox:SetTextInsets(10, 10, 10, 10)
+mainEditBox:SetBackdrop(nil) -- Remove the white border
+mainScrollFrame:SetScrollChild(mainEditBox)
+
+-- Escape key handling for Main Edit Box
+mainEditBox:SetScript("OnKeyDown", function(self, key)
+    if key == "ESCAPE" then
+        self:ClearFocus()
+        self:EnableKeyboard(false)
+        C_Timer.After(0.1, function() self:EnableKeyboard(true) end)  -- Re-enable keyboard input
+    end
+end)
+
+PSK.MainListEditBox = mainEditBox
+
+-- Placeholder text for main edit box
+mainEditBox:SetScript("OnShow", function(self)
+    if self:GetText() == "" then
+        self:SetText("|cff999999Type your main list here...|r")
+    end
+end)
+
+mainEditBox:SetScript("OnEditFocusGained", function(self)
+    if self:GetText() == "|cff999999Type your main list here...|r" then
+        self:SetText("")
+    end
+end)
+
+mainEditBox:SetScript("OnEditFocusLost", function(self)
+    if self:GetText() == "" then
+        self:SetText("|cff999999Type your main list here...|r")
+    end
+end)
+
+------------------------------
+-- Create Tier List Frame
+------------------------------
+
+local tierListFrame = CreateFrame("Frame", "PSKTierListFrame", PSK.ImportExportFrame, "BackdropTemplate")
+tierListFrame:SetPoint("TOPLEFT", mainListFrame, "TOPRIGHT", 20, 0)
+tierListFrame:SetSize(300, 340)
+tierListFrame:SetBackdrop({
+    bgFile = "Interface\\ACHIEVEMENTFRAME\\UI-Achievement-Parchment-Horizontal",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 256, edgeSize = 16,
+    insets = { left = 8, right = 8, top = 8, bottom = 8 },
+})
+tierListFrame:SetBackdropColor(1, 1, 1, 0.9)
+
+-- Create Tier List Title
+local tierListTitle = tierListFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+tierListTitle:SetPoint("TOP", 0, -10)
+tierListTitle:SetText("Tier List")
+
+-- Create Tier List Scroll Frame
+local tierScrollFrame = CreateFrame("ScrollFrame", "PSKTierListScrollFrame", tierListFrame, "UIPanelScrollFrameTemplate")
+tierScrollFrame:SetPoint("TOPLEFT", 10, -40)
+tierScrollFrame:SetSize(280, 280)
+
+-- Remove the default scroll frame background
+local scrollBg = _G["PSKTierListScrollFrameBG"]
+if scrollBg then
+    scrollBg:SetTexture(nil)
+end
+
+-- Create Tier List Edit Box
+local tierEditBox = CreateFrame("EditBox", "PSKTierListEditBox", tierScrollFrame, "BackdropTemplate")
+tierEditBox:SetMultiLine(true)
+tierEditBox:SetFontObject(GameFontHighlight)
+tierEditBox:SetAutoFocus(false)
+tierEditBox:SetSize(280, 280)
+tierEditBox:SetTextInsets(10, 10, 10, 10)
+tierEditBox:SetBackdrop(nil) -- Remove the white border
+
+-- Escape key handling for Tier Edit Box
+tierEditBox:SetScript("OnKeyDown", function(self, key)
+    if key == "ESCAPE" then
+        self:ClearFocus()
+        self:EnableKeyboard(false)
+        C_Timer.After(0.1, function() self:EnableKeyboard(true) end)  -- Re-enable keyboard input
+    end
+end)
+
+tierScrollFrame:SetScrollChild(tierEditBox)
+
+-- Add placeholder text for Tier List
+tierEditBox:SetScript("OnShow", function(self)
+    if self:GetText() == "" then
+        self:SetText("|cff999999Type your tier list here...|r")
+    end
+end)
+
+tierEditBox:SetScript("OnEditFocusGained", function(self)
+    if self:GetText() == "|cff999999Type your tier list here...|r" then
+        self:SetText("")
+    end
+end)
+
+tierEditBox:SetScript("OnEditFocusLost", function(self)
+    if self:GetText() == "" then
+        self:SetText("|cff999999Type your tier list here...|r")
+    end
+end)
+
+PSK.TierListEditBox = tierEditBox
+
+------------------------------
 -- Import Button
-local importButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
+------------------------------
+
+local importButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
 importButton:SetSize(120, 30)
-importButton:SetPoint("BOTTOMLEFT", importExportEditBox, "BOTTOMLEFT", 0, -40)
+importButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 20, 20)
 importButton:SetText("Import")
 importButton:SetScript("OnClick", function()
-    local text = importExportEditBox:GetText()
-    PSK:ImportLists(text)
-    importExportEditBox:SetText("")
-    print("[PSK] Lists Imported Successfully")
+    local mainText = PSK.MainListEditBox:GetText()
+    local tierText = PSK.TierListEditBox:GetText()
+
+    -- Confirm before importing
+    StaticPopupDialogs["PSK_CONFIRM_IMPORT"] = {
+        text = "Are you sure you want to import these lists? This will overwrite your current Main and Tier lists.",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+            PSK:ImportLists(mainText, tierText)
+            PSK.MainListEditBox:SetText("")
+            PSK.TierListEditBox:SetText("")
+            print("[PSK] Lists Imported Successfully")
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+
+    -- Show the confirmation dialog
+    StaticPopup_Show("PSK_CONFIRM_IMPORT")
 end)
 
+------------------------------
 -- Export Button
-local exportButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
+------------------------------
+
+local exportButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
 exportButton:SetSize(120, 30)
-exportButton:SetPoint("BOTTOMRIGHT", importExportEditBox, "BOTTOMRIGHT", 0, -40)
+exportButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -20, 20)
 exportButton:SetText("Export")
 exportButton:SetScript("OnClick", function()
-    local exportedText = PSK:ExportLists()
-    importExportEditBox:SetText(exportedText)
-    importExportEditBox:HighlightText()
-    importExportEditBox:SetFocus()
+    local mainList, tierList = PSK:ExportLists()
+    PSK.MainListEditBox:SetText(mainList)
+    PSK.TierListEditBox:SetText(tierList)
+    PSK.MainListEditBox:HighlightText()
+    PSK.TierListEditBox:HighlightText()
+    PSK.MainListEditBox:SetFocus()
     print("[PSK] Lists Exported Successfully")
 end)
+
+
+
+
+
 
 
 
@@ -403,18 +569,12 @@ local dropCount = #PSK.LootDrops
 lootHeader:SetText("Loot Drops")
 -- lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
 
-
-
-
-
-
-
 ------------------------------
 -- Create Tabs for MainFrame
 ------------------------------
 
 PSK.Tabs = {}
-PanelTemplates_SetNumTabs(PSK.MainFrame, 4)
+PanelTemplates_SetNumTabs(PSK.MainFrame, 5)
 
 ------------------------------
 -- Set Tab 1 (PSK)
@@ -461,6 +621,17 @@ PanelTemplates_TabResize(tab4, 0)
 PSK.Tabs[4] = tab4
 
 ------------------------------
+-- Tab 5 (Import/Export)
+------------------------------
+
+local tab5 = CreateFrame("Button", "PSKMainFrameTab5", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
+tab5:SetID(5)
+tab5:SetText("Import/Export")
+tab5:SetPoint("LEFT", tab4, "RIGHT", -16, 0)
+PanelTemplates_TabResize(tab5, 0)
+PSK.Tabs[5] = tab5
+
+------------------------------
 -- Create Settings UI
 ------------------------------
 
@@ -489,19 +660,27 @@ soundCheckbox:SetScript("OnClick", function(self)
     print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
 end)
 
---------------------------------
--- Tab-switching Logic
---------------------------------
+------------------------------
+-- Tab-Switching Logic
+------------------------------
+
 hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
     local tabID = self:GetID()
     PanelTemplates_SetTab(PSK.MainFrame, tabID)
+
+    -- Deselect all tabs
+    for _, tab in ipairs(PSK.Tabs) do
+        if tab:GetID() ~= tabID then
+            PanelTemplates_DeselectTab(tab)
+        end
+    end
 
     -- Hide all frames first
     PSK.ContentFrame:Hide()
     PSK.SettingsFrame:Hide()
     PSK.LogsFrame:Hide()
     PSK.ManageFrame:Hide()
-    PSKImportExportFrame:Hide()  -- Add this line
+    PSK.ImportExportFrame:Hide()
 
     -- Show the selected frame
     if tabID == 1 then
@@ -511,25 +690,25 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
         PSK:RefreshAvailableMembers()
     elseif tabID == 3 then
         PSK.SettingsFrame:Show()
-        PSKImportExportFrame:Show()  -- Ensure this is shown on Settings tab
     elseif tabID == 4 then
         PSK.LogsFrame:Show()
+    elseif tabID == 5 then
+        PSK.ImportExportFrame:Show()
     end
 end)
 
 
-
 ----------------------------------
--- Sets the default selected tab
+-- Set the default selected tab
 ----------------------------------
 
 PanelTemplates_SetTab(PSK.MainFrame, 1)
+
 PSK.ContentFrame:Show()
 PSK.SettingsFrame:Hide()
 PSK.ManageFrame:Hide()
 PSK.LogsFrame:Hide()
-
-print("[PSK] Manage Tab Initialized")
+PSKImportExportFrame:Hide()
 
 
 

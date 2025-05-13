@@ -475,7 +475,6 @@ end
 function PSK:RefreshPlayerList()
 
 	if InCombatLockdown() then
-        print("[PSK] Cannot update player list during combat. Update will be delayed.")
         PSK:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
     end
@@ -1193,16 +1192,77 @@ end
 --------------------------------------------
 
 function PSK:ExportLists()
+    -- Format the lists with one name per line, comma-separated
     local function formatList(list)
-        return table.concat(list, ", ")
+        local formatted = {}
+        for _, name in ipairs(list or {}) do
+            table.insert(formatted, name .. ",")
+        end
+        return table.concat(formatted, "\n")
     end
     
     local mainList = formatList(PSKDB.MainList or {})
     local tierList = formatList(PSKDB.TierList or {})
     
-    return "Main List:\n" .. mainList .. "\n\nTier List:\n" .. tierList
+    return mainList, tierList
 end
 
+
+-------------------------------------------
+-- Import Lists from Separate Text Boxes
+-------------------------------------------
+
+function PSK:ImportLists()
+    local mainText = PSK.MainListEditBox:GetText()
+    local tierText = PSK.TierListEditBox:GetText()
+
+    -- Clear current lists
+    PSKDB.MainList = {}
+    PSKDB.TierList = {}
+
+    -- Get all guild members
+    local guildMembers = {}
+    if IsInGuild() then
+        for i = 1, GetNumGuildMembers() do
+            local fullName = GetGuildRosterInfo(i)
+            if fullName then
+                local shortName = Ambiguate(fullName, "short")
+                guildMembers[shortName:lower()] = true
+            end
+        end
+    end
+
+    -- Import Main List
+    for name in mainText:gmatch("[^,\n]+") do
+        local trimmedName = name:match("^%s*(.-)%s*$")
+        if trimmedName ~= "" then
+			table.insert(PSKDB.MainList, trimmedName)
+            -- if guildMembers[trimmedName:lower()] then
+                -- table.insert(PSKDB.MainList, trimmedName)
+            -- else
+                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Main List.|r")
+            -- end
+        end
+    end
+
+    -- Import Tier List
+    for name in tierText:gmatch("[^,\n]+") do
+        local trimmedName = name:match("^%s*(.-)%s*$")
+        if trimmedName ~= "" then
+            
+			table.insert(PSKDB.TierList, trimmedName)
+			-- if guildMembers[trimmedName:lower()] then
+                -- table.insert(PSKDB.TierList, trimmedName)
+            -- else
+                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Tier List.|r")
+            -- end
+        end
+    end
+
+    -- Update the UI
+    PSK:RefreshPlayerList()
+    print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
+end
 
 
 
