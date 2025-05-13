@@ -475,7 +475,6 @@ end
 function PSK:RefreshPlayerList()
 
 	if InCombatLockdown() then
-        print("[PSK] Cannot update player list during combat. Update will be delayed.")
         PSK:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
     end
@@ -1192,77 +1191,77 @@ end
 -- Add Import/Export Section to Settings Tab
 --------------------------------------------
 
-function PSK:CreateImportExportSection()
-    -- Create Import/Export frame
-    local importExportFrame = CreateFrame("Frame", "PSKImportExportFrame", PSK.SettingsFrame)
-    importExportFrame:SetSize(600, 300)
-    importExportFrame:SetPoint("TOPLEFT", PSK.SettingsFrame, "TOPLEFT", 20, -300)
-
-    -- Title
-    local title = importExportFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, 0)
-    title:SetText("Import/Export Player Lists")
-
-    -- Scroll Frame
-    local scrollFrame = CreateFrame("ScrollFrame", "PSKImportExportScrollFrame", importExportFrame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetSize(580, 200)
-    scrollFrame:SetPoint("TOPLEFT", importExportFrame, "TOPLEFT", 0, -40)
-
-    -- Edit Box
-    local editBox = CreateFrame("EditBox", "PSKImportExportEditBox", scrollFrame)
-    editBox:SetMultiLine(true)
-    editBox:SetFontObject(GameFontHighlight)
-    editBox:SetWidth(560) -- Match the inner width of the scroll frame
-    editBox:SetAutoFocus(false)
-    editBox:SetTextInsets(10, 10, 10, 10)
-    editBox:SetMaxLetters(10000)
-
-    scrollFrame:SetScrollChild(editBox)
-
-    -- Add the OnVerticalScroll handler
-    scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
-        self:SetVerticalScroll(offset)
-    end)
-
-    -- Import Button
-    local importButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
-    importButton:SetSize(120, 30)
-    importButton:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMLEFT", 0, -40)
-    importButton:SetText("Import")
-    importButton:SetScript("OnClick", function()
-        local text = editBox:GetText()
-        PSK:ImportLists(text)
-        editBox:SetText("")
-        print("[PSK] Lists Imported Successfully")
-    end)
-
-    -- Export Button
-    local exportButton = CreateFrame("Button", nil, importExportFrame, "UIPanelButtonTemplate")
-    exportButton:SetSize(120, 30)
-    exportButton:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, -40)
-    exportButton:SetText("Export")
-    exportButton:SetScript("OnClick", function()
-        local exportedText = PSK:ExportLists()
-        editBox:SetText(exportedText)
-        editBox:HighlightText()
-        editBox:SetFocus()
-        print("[PSK] Lists Exported Successfully")
-    end)
-
-    PSK.ImportExportFrame = importExportFrame
-end
-
-
 function PSK:ExportLists()
+    -- Format the lists with one name per line, comma-separated
     local function formatList(list)
-        return table.concat(list, ",")
+        local formatted = {}
+        for _, name in ipairs(list or {}) do
+            table.insert(formatted, name .. ",")
+        end
+        return table.concat(formatted, "\n")
     end
     
     local mainList = formatList(PSKDB.MainList or {})
     local tierList = formatList(PSKDB.TierList or {})
     
-    local exportText = "Main List:\n" .. mainList .. "\n\nTier List:\n" .. tierList
-    return exportText
+    return mainList, tierList
+end
+
+
+-------------------------------------------
+-- Import Lists from Separate Text Boxes
+-------------------------------------------
+
+function PSK:ImportLists()
+    local mainText = PSK.MainListEditBox:GetText()
+    local tierText = PSK.TierListEditBox:GetText()
+
+    -- Clear current lists
+    PSKDB.MainList = {}
+    PSKDB.TierList = {}
+
+    -- Get all guild members
+    local guildMembers = {}
+    if IsInGuild() then
+        for i = 1, GetNumGuildMembers() do
+            local fullName = GetGuildRosterInfo(i)
+            if fullName then
+                local shortName = Ambiguate(fullName, "short")
+                guildMembers[shortName:lower()] = true
+            end
+        end
+    end
+
+    -- Import Main List
+    for name in mainText:gmatch("[^,\n]+") do
+        local trimmedName = name:match("^%s*(.-)%s*$")
+        if trimmedName ~= "" then
+			table.insert(PSKDB.MainList, trimmedName)
+            -- if guildMembers[trimmedName:lower()] then
+                -- table.insert(PSKDB.MainList, trimmedName)
+            -- else
+                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Main List.|r")
+            -- end
+        end
+    end
+
+    -- Import Tier List
+    for name in tierText:gmatch("[^,\n]+") do
+        local trimmedName = name:match("^%s*(.-)%s*$")
+        if trimmedName ~= "" then
+            
+			table.insert(PSKDB.TierList, trimmedName)
+			-- if guildMembers[trimmedName:lower()] then
+                -- table.insert(PSKDB.TierList, trimmedName)
+            -- else
+                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Tier List.|r")
+            -- end
+        end
+    end
+
+    -- Update the UI
+    PSK:RefreshPlayerList()
+    print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
 end
 
 
