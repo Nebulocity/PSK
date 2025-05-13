@@ -1265,5 +1265,80 @@ function PSK:ImportLists()
 end
 
 
+-------------------------------------------
+-- Refresh member data when group changes.
+-------------------------------------------
+
+function PSK:RefreshGroupMemberData()
+    local function updateIfNeeded(unit)
+        if not UnitExists(unit) then return end
+
+        local name = Ambiguate(UnitName(unit), "short")
+        if not name then return end
+
+        local listed = false
+        for _, n in ipairs(PSKDB.MainList) do
+            if Ambiguate(n, "short") == name then
+                listed = true
+                break
+            end
+        end
+        for _, n in ipairs(PSKDB.TierList) do
+            if Ambiguate(n, "short") == name then
+                listed = true
+                break
+            end
+        end
+
+        if not listed then return end
+
+        local data = PSKDB.Players[name]
+		local needsUpdate = false
+
+		if not data then
+			needsUpdate = true
+		else
+			if data.class == "UNKNOWN" or data.class == "SHAMAN" then
+				needsUpdate = true
+			elseif data.level == "???" or not tonumber(data.level) then
+				needsUpdate = true
+			end
+		end
+
+
+        if needsUpdate then
+            local _, class = UnitClass(unit)
+            local level = UnitLevel(unit)
+            local zone = GetZoneText()
+            local online = UnitIsConnected(unit)
+            local inRaid = UnitInRaid(unit) ~= nil
+
+            PSKDB.Players[name] = {
+                class = class or "UNKNOWN",
+                level = level or "???",
+                zone = zone or "Unknown",
+                online = online or false,
+                inRaid = inRaid,
+            }
+
+            print("[PSK] Updated data for " .. name .. " from party/raid info.")
+            PSK:RefreshPlayerList()
+        end
+    end
+
+    if IsInRaid() then
+        for i = 1, MAX_RAID_MEMBERS do
+            updateIfNeeded("raid" .. i)
+        end
+    elseif IsInGroup() then
+        for i = 1, GetNumGroupMembers() - 1 do
+            updateIfNeeded("party" .. i)
+        end
+        updateIfNeeded("player") -- also update the user themselves if listed
+    end
+end
+
+
+
 
 PSK:RefreshLogList()

@@ -242,9 +242,15 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     if PSK and PSK.RefreshAvailableMembers then
         PSK:RefreshAvailableMembers()
     end
+	
     if PSK and PSK.RefreshPlayerList then
         PSK:RefreshPlayerList()
     end
+	
+	if event == "GROUP_ROSTER_UPDATE" then
+		PSK:RefreshGroupMemberData()
+	end
+
 end)
 
 print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
@@ -585,12 +591,12 @@ function PSK:AddPlayerFromCommand(name, listType, position)
     -- Normalize and clean input
     local rawName = Ambiguate(name, "short"):gsub("%s+", "")
     local nameLower = rawName:lower()
-    local nameProper = PSK:AddPlayerFromCommand(rawName)
+    local nameProper = PSKCapitalizeName(rawName)
 
     -- Check if name is in player
     local foundInPlayer = false
-    for i = 1, GetNumPlayerMembers() do
-        local gName = GetPlayerRosterInfo(i)
+    for i = 1, GetNumGuildMembers() do
+        local gName = GetGuildRosterInfo(i)
         if gName and Ambiguate(gName, "short"):lower() == nameLower then
             foundInPlayer = true
             break
@@ -620,11 +626,12 @@ function PSK:AddPlayerFromCommand(name, listType, position)
             end
         end
     end
-
-    if not foundInPlayer and not foundInRaidOrParty then
-        print("[PSK] Error: '" .. nameProper .. "' is not in your player, raid, or party. Cannot add.")
-        return
-    end
+	
+	-- -- Non-guild members can be added.
+    -- if not foundInPlayer and not foundInRaidOrParty then
+        -- print("[PSK] Error: '" .. nameProper .. "' is not in your player, raid, or party. Cannot add.")
+        -- return
+    -- end
 
     -- Choose target list
     local list = (listType == "tier") and PSKDB.TierList or PSKDB.MainList
@@ -646,15 +653,15 @@ function PSK:AddPlayerFromCommand(name, listType, position)
 
     -- Fill in player data if not already in the DB
     if not PSKDB.Players[nameProper] then
-        local class = "UNKNOWN"
+        local class = "SHAMAN" 
         local level = "???"
         local zone = "Unknown"
         local online = false
         local inRaid = false
 
-        -- Try player roster first
-        for i = 1, GetNumPlayerMembers() do
-            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetPlayerRosterInfo(i)
+        -- Try guild roster first
+        for i = 1, GetNumGuildMembers() do
+            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
             if gName and Ambiguate(gName, "short"):lower() == nameLower then
                 class = gClassFile or class
                 level = gLevel or level
@@ -664,15 +671,16 @@ function PSK:AddPlayerFromCommand(name, listType, position)
             end
         end
 
-        -- If not found, use party/raid unit data
-        if class == "UNKNOWN" and unit then
-            local _, classFile = UnitClass(unit)
-            class = classFile or class
-            level = UnitLevel(unit) or level
-            zone = GetZoneText()
-            online = UnitIsConnected(unit)
-            inRaid = UnitInRaid(unit) ~= nil
-        end
+        -- If the player is in your raid or party, fill in more accurate data
+		if unit then
+			local _, classFile = UnitClass(unit)
+			class = classFile or class
+			level = UnitLevel(unit) or level
+			zone = GetZoneText()
+			online = UnitIsConnected(unit)
+			inRaid = UnitInRaid(unit) ~= nil
+		end
+
 
         PSKDB.Players[nameProper] = {
             class = class,
@@ -681,6 +689,10 @@ function PSK:AddPlayerFromCommand(name, listType, position)
             level = level,
             zone = zone,
         }
+		
+		if not foundInPlayer and not foundInRaidOrParty then
+			print("[PSK] Warning: " .. nameProper .. " is not in your guild, raid, or party. Added with default info.")
+		end
     end
 
     print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
