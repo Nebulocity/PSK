@@ -27,7 +27,7 @@ CLASS_NAME_TO_FILE = {
     ["Druid"]   = "DRUID",
 }
 
-RAID_CLASS_COLORS = {
+local CLASS_COLORS = RAID_CLASS_COLORS or {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
     PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
     HUNTER  = { r = 0.67, g = 0.83, b = 0.45 },
@@ -475,9 +475,12 @@ end
 function PSK:RefreshPlayerList()
 
 	if InCombatLockdown() then
-        PSK:RegisterEvent("PLAYER_REGEN_ENABLED")
-        return
-    end
+		if PSK.EventFrame and PSK.EventFrame.RegisterEvent then
+			PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+		return
+	end
+
 	
     if not PSKDB or not PSK.CurrentList then return end
 	
@@ -544,10 +547,20 @@ function PSK:RefreshPlayerList()
         local classIcon = row:CreateTexture(nil, "ARTWORK")
         classIcon:SetSize(16, 16)
         classIcon:SetPoint("LEFT", posText, "RIGHT", 8, 0)
-        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-        if CLASS_ICON_TCOORDS[class] then
-            classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
-        end
+		
+        -- classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+        -- if CLASS_ICON_TCOORDS[class] then
+            -- classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+        -- end
+		if CLASS_ICON_TCOORDS[class] then
+			classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+			classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+		else
+			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			classIcon:SetTexCoord(0, 1, 0, 1)
+		end
+
+
 
 		-- Extract the player class
 		local playerClass = playerData and playerData.class or "SHAMAN"
@@ -1263,6 +1276,80 @@ function PSK:ImportLists()
     PSK:RefreshPlayerList()
     print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
 end
+
+
+-------------------------------------------
+-- Refresh member data when group changes.
+-------------------------------------------
+
+function PSK:RefreshGroupMemberData()
+    local function updateIfNeeded(unit)
+        if not UnitExists(unit) then return end
+
+        local name = Ambiguate(UnitName(unit), "short")
+        if not name then return end
+
+        local listed = false
+        for _, n in ipairs(PSKDB.MainList) do
+            if Ambiguate(n, "short") == name then
+                listed = true
+                break
+            end
+        end
+        for _, n in ipairs(PSKDB.TierList) do
+            if Ambiguate(n, "short") == name then
+                listed = true
+                break
+            end
+        end
+
+        if not listed then return end
+
+        local data = PSKDB.Players[name]
+		local needsUpdate = false
+
+		if not data then
+			needsUpdate = true
+		else
+			if data.class == "UNKNOWN" or data.class == "SHAMAN" then
+				needsUpdate = true
+			elseif data.level == "???" or not tonumber(data.level) then
+				needsUpdate = true
+			end
+		end
+
+
+        if needsUpdate then
+            local _, class = UnitClass(unit)
+            local level = UnitLevel(unit)
+            local zone = GetZoneText()
+            local online = UnitIsConnected(unit)
+            local inRaid = UnitInRaid(unit) ~= nil
+
+            PSKDB.Players[name] = {
+                class = class or "UNKNOWN",
+                level = level or "???",
+                zone = zone or "Unknown",
+                online = online or false,
+                inRaid = inRaid,
+            }
+
+            PSK:RefreshPlayerList()
+        end
+    end
+
+    if IsInRaid() then
+        for i = 1, MAX_RAID_MEMBERS do
+            updateIfNeeded("raid" .. i)
+        end
+    elseif IsInGroup() then
+        for i = 1, GetNumGroupMembers() - 1 do
+            updateIfNeeded("party" .. i)
+        end
+        updateIfNeeded("player") -- also update the user themselves if listed
+    end
+end
+
 
 
 
