@@ -855,10 +855,6 @@ function PSK:RefreshAvailableMembers()
         end
 
         -- Player Name
-        -- local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        -- nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
-        -- nameText:SetText(player.name)
-		-- Player Name with Class Color
 		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
 
@@ -987,6 +983,15 @@ function PSK:RefreshBidList()
         child:SetParent(nil)
     end
 
+	-- Sort bidder table
+	table.sort(PSK.BidEntries, function(a, b)
+		local indexA = indexMap[a] or math.huge
+		local indexB = indexMap[b] or math.huge
+		
+		return indexA < indexB
+	end)
+
+	-- Start displaying rows
     local yOffset = -5
     for index, bidData in ipairs(PSK.BidEntries) do
         local row = CreateFrame("Button", nil, scrollChild)
