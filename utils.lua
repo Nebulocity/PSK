@@ -344,6 +344,9 @@ function PSK:RefreshLootList()
     local rarityName = rarityNames[threshold] or "?"
     -- header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
 	header:SetText("Loot Drops")
+	
+	-- Broadcast update
+	PSK:BroadcastUpdate("RefreshLootList")
 end
 
 
@@ -465,6 +468,9 @@ function PSK:RefreshLogList()
     if header then
         header:SetText("Loot Logs (" .. #PSKDB.LootLogs .. ")")
     end
+	
+	-- Broadcast update
+	PSK:BroadcastUpdate("RefreshLogList")
 end
 
 
@@ -687,6 +693,9 @@ function PSK:RefreshPlayerList()
 
         yOffset = yOffset - 22
     end
+	
+	-- Broadcast update
+	PSK:BroadcastUpdate("RefreshPlayerList")
 end
 
 
@@ -1162,6 +1171,9 @@ function PSK:RefreshBidList()
 
         yOffset = yOffset - 22
     end
+	
+	-- Broadcast update
+	PSK:BroadcastUpdate("RefreshBidList")
 end
 
 ----------------------------------------
@@ -1355,7 +1367,28 @@ function PSK:RefreshGroupMemberData()
     end
 end
 
+-------------------------------------------
+-- Serialize Data
+-------------------------------------------
 
+function PSK:Serialize(tbl)
+	return table.concat( { tbl.type, tbl.timestamp }, "|")
+
+
+-------------------------------------------
+-- Broadcast Update
+-------------------------------------------
+
+function PSK:BroadcastUpdate(eventType)
+	local payload = {
+		type = eventType,
+		timestamp = time()
+	}
+	
+	local message = PSK:Serialize(payload)
+	C_ChatInfo.SendAddonMessage(PSK.PSK_PREFIX, message, "GUILD" -- RAID, PARTY, and WHISPER work also
+	
+end
 
 
 PSK:RefreshLogList()
