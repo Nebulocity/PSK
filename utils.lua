@@ -27,7 +27,7 @@ CLASS_NAME_TO_FILE = {
     ["Druid"]   = "DRUID",
 }
 
-RAID_CLASS_COLORS = {
+local CLASS_COLORS = RAID_CLASS_COLORS or {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
     PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
     HUNTER  = { r = 0.67, g = 0.83, b = 0.45 },
@@ -855,10 +855,6 @@ function PSK:RefreshAvailableMembers()
         end
 
         -- Player Name
-        -- local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        -- nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
-        -- nameText:SetText(player.name)
-		-- Player Name with Class Color
 		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		nameText:SetPoint("LEFT", classIcon, "RIGHT", 10, 0)
 
@@ -987,6 +983,15 @@ function PSK:RefreshBidList()
         child:SetParent(nil)
     end
 
+	-- Sort bidder table
+	table.sort(PSK.BidEntries, function(a, b)
+		local indexA = indexMap[a] or math.huge
+		local indexB = indexMap[b] or math.huge
+		
+		return indexA < indexB
+	end)
+
+	-- Start displaying rows
     local yOffset = -5
     for index, bidData in ipairs(PSK.BidEntries) do
         local row = CreateFrame("Button", nil, scrollChild)
