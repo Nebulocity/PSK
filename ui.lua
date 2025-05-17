@@ -270,26 +270,11 @@ local importButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelB
 importButton:SetSize(120, 30)
 importButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 20, 20)
 importButton:SetText("Import")
+
 importButton:SetScript("OnClick", function()
     local mainText = PSK.MainListEditBox:GetText()
     local tierText = PSK.TierListEditBox:GetText()
-
-    -- Confirm before importing
-    StaticPopupDialogs["PSK_CONFIRM_IMPORT"] = {
-        text = "Are you sure you want to import these lists? This will overwrite your current Main and Tier lists.",
-        button1 = "Yes",
-        button2 = "No",
-        OnAccept = function()
-            PSK:ImportLists(mainText, tierText)
-            PSK.MainListEditBox:SetText("")
-            PSK.TierListEditBox:SetText("")
-            print("[PSK] Lists Imported Successfully")
-        end,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-    }
+   
 
     -- Show the confirmation dialog
     StaticPopup_Show("PSK_CONFIRM_IMPORT")
@@ -698,6 +683,25 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
 end)
 
 
+
+-- Static popup dialog
+    StaticPopupDialogs["PSK_CONFIRM_IMPORT"] = {
+        text = "Are you sure you want to import these lists? This will overwrite your current Main and Tier lists.",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+            PSK:ImportLists(mainText, tierText)
+            PSK.MainListEditBox:SetText("")
+            PSK.TierListEditBox:SetText("")
+            print("[PSK] Lists Imported Successfully")
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+	
+	
 ----------------------------------
 -- Set the default selected tab
 ----------------------------------

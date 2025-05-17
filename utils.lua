@@ -346,7 +346,7 @@ function PSK:RefreshLootList()
 	header:SetText("Loot Drops")
 	
 	-- Broadcast update
-	PSK:BroadcastUpdate("RefreshLootList")
+	-- PSK:BroadcastUpdate("RefreshLootList")
 end
 
 
@@ -470,7 +470,7 @@ function PSK:RefreshLogList()
     end
 	
 	-- Broadcast update
-	PSK:BroadcastUpdate("RefreshLogList")
+	-- PSK:BroadcastUpdate("RefreshLogList")
 end
 
 
@@ -695,7 +695,7 @@ function PSK:RefreshPlayerList()
     end
 	
 	-- Broadcast update
-	PSK:BroadcastUpdate("RefreshPlayerList")
+	-- PSK:BroadcastUpdate("RefreshPlayerList")
 end
 
 
@@ -1173,7 +1173,7 @@ function PSK:RefreshBidList()
     end
 	
 	-- Broadcast update
-	PSK:BroadcastUpdate("RefreshBidList")
+	-- PSK:BroadcastUpdate("RefreshBidList")
 end
 
 ----------------------------------------
@@ -1379,16 +1379,17 @@ function PSK:Serialize(tbl)
 -- Broadcast Update
 -------------------------------------------
 
-function PSK:BroadcastUpdate(eventType)
-	local payload = {
-		type = eventType,
-		timestamp = time()
-	}
+-- function PSK:BroadcastUpdate(eventType)
+	-- local payload = {
+		-- type = eventType,
+		-- timestamp = time()
+	-- }
 	
-	local message = PSK:Serialize(payload)
-	C_ChatInfo.SendAddonMessage(PSK.PSK_PREFIX, message, "GUILD" -- RAID, PARTY, and WHISPER work also
+	-- local message = PSK:Serialize(payload)
 	
-end
+	-- C_ChatInfo.SendAddonMessage(PSK.PSK_PREFIX, message, "GUILD") -- RAID, PARTY, and WHISPER work also
+	
+-- end
 
 
 PSK:RefreshLogList()
