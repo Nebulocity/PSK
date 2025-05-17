@@ -4,6 +4,9 @@
 
 local PSK = select(2, ...)
 
+-- Facilites row pools.
+PSK.RowPool = PSK.RowPool or {}
+
 ---------------------------------------------------
 -- Set/Get important details we'll need below
 ---------------------------------------------------
@@ -273,69 +276,92 @@ function PSK:RefreshLootList()
         end
     end
 
+    PSK.RowPool = PSK.RowPool or {}
+    PSK.RowPool[scrollChild] = PSK.RowPool[scrollChild] or {}
+    local pool = PSK.RowPool[scrollChild]
+
     local yOffset = -5
 
     for index, loot in ipairs(PSKGlobal.LootDrops) do
-        local row = CreateFrame("Button", nil, scrollChild)
-        row.bg = row:CreateTexture(nil, "BACKGROUND")
-        row.bg:SetAllPoints()
+        local row = pool[index]
+        if not row then
+            row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
+            row:SetSize(240, 20)
+            row:SetFrameLevel(scrollChild:GetFrameLevel() + 1)
+            pool[index] = row
+        end
+
+        row:SetParent(scrollChild)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, yOffset)
+        row:Show()
+
+        -- Setup visuals once
+        if not row.bg then
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetAllPoints()
+        end
         row.bg:SetColorTexture(0, 0, 0, 0)
-        row:SetSize(240, 20)
-        row:SetPoint("TOP", 30, yOffset)
 
-        local iconTexture = row:CreateTexture(nil, "ARTWORK")
-        iconTexture:SetSize(16, 16)
-        iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
-        iconTexture:SetTexture(loot.itemTexture)
+        if not row.iconTexture then
+            row.iconTexture = row:CreateTexture(nil, "ARTWORK")
+            row.iconTexture:SetSize(16, 16)
+            row.iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
 
-        -- Make row clickable and show tooltip
-        row:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(loot.itemLink)
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
+            row.itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.itemText:SetPoint("LEFT", row.iconTexture, "RIGHT", 8, 0)
 
-        row:SetScript("OnClick", function()
-            if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
-                PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
-            end
-            row.bg:SetColorTexture(0.2, 0.6, 1, 0.2)
-            PSK.SelectedLootRow = row
-            PSK.SelectedItem = loot.itemLink
-            PSK.SelectedItemData = loot  -- Store the full loot item data
-            PSK.BidButton:Enable()
-            print("[PSK] Selected item for bidding: " .. loot.itemLink)
+            row:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink(row.itemLink or "")
+                GameTooltip:Show()
+            end)
 
-            -- Pulse animation
-            local pulse = row:CreateAnimationGroup()
-            local fadeOut = pulse:CreateAnimation("Alpha")
-            fadeOut:SetFromAlpha(1)
-            fadeOut:SetToAlpha(0.4)
-            fadeOut:SetDuration(0.2)
-            fadeOut:SetOrder(1)
+            row:SetScript("OnLeave", GameTooltip_Hide)
 
-            local fadeIn = pulse:CreateAnimation("Alpha")
-            fadeIn:SetFromAlpha(0.4)
-            fadeIn:SetToAlpha(1)
-            fadeIn:SetDuration(0.2)
-            fadeIn:SetOrder(2)
+            row:SetScript("OnClick", function()
+                if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+                    PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
+                end
+                row.bg:SetColorTexture(0.2, 0.6, 1, 0.2)
+                PSK.SelectedLootRow = row
+                PSK.SelectedItem = row.itemLink
+                PSK.SelectedItemData = row.lootData
+                PSK.BidButton:Enable()
+                print("[PSK] Selected item for bidding: " .. row.itemLink)
 
-            pulse:SetLooping("NONE")
-            pulse:Play()
-        end)
+                local pulse = row:CreateAnimationGroup()
+                local fadeOut = pulse:CreateAnimation("Alpha")
+                fadeOut:SetFromAlpha(1)
+                fadeOut:SetToAlpha(0.4)
+                fadeOut:SetDuration(0.2)
+                fadeOut:SetOrder(1)
 
-        -- Add the FontString for visual text
-        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
-        itemText:SetText(loot.itemLink)
+                local fadeIn = pulse:CreateAnimation("Alpha")
+                fadeIn:SetFromAlpha(0.4)
+                fadeIn:SetToAlpha(1)
+                fadeIn:SetDuration(0.2)
+                fadeIn:SetOrder(2)
+
+                pulse:SetLooping("NONE")
+                pulse:Play()
+            end)
+        end
+
+        -- Update visuals each loop
+        row.iconTexture:SetTexture(loot.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
+        row.itemText:SetText(loot.itemLink or "Unknown")
+        row.itemLink = loot.itemLink
+        row.lootData = loot
 
         yOffset = yOffset - 22
     end
 
-    -- Update header
+    -- Hide unused rows
+    for i = #PSKGlobal.LootDrops + 1, #pool do
+        if pool[i] then pool[i]:Hide() end
+    end
+
     local threshold = PSK.Settings.lootThreshold or 3
     local rarityNames = {
         [0] = "Poor", [1] = "Common", [2] = "Uncommon",
@@ -343,10 +369,9 @@ function PSK:RefreshLootList()
     }
     local rarityName = rarityNames[threshold] or "?"
     -- header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
-	header:SetText("Loot Drops")
-	
-	-- Broadcast update
-	-- PSK:BroadcastUpdate("RefreshLootList")
+    header:SetText("Loot Drops")
+
+    -- PSK:BroadcastUpdate("RefreshLootList")
 end
 
 
@@ -359,18 +384,18 @@ function PSK:RefreshLogList()
 
     local scrollChild = PSK.ScrollChildren.Logs
     local header = PSK.Headers.Logs
-	
-	if PSK.RecordingWarning then
-		if not PSK.LootRecordingActive then
-			PSK.RecordingWarning:Show()
-			if not PSK.RecordingWarning.pulse:IsPlaying() then
-				PSK.RecordingWarning.pulse:Play()
-			end
-		else
-			PSK.RecordingWarning:Hide()
-			PSK.RecordingWarning.pulse:Stop()
-		end
-	end
+
+    if PSK.RecordingWarning then
+        if not PSK.LootRecordingActive then
+            PSK.RecordingWarning:Show()
+            if not PSK.RecordingWarning.pulse:IsPlaying() then
+                PSK.RecordingWarning.pulse:Play()
+            end
+        else
+            PSK.RecordingWarning:Hide()
+            PSK.RecordingWarning.pulse:Stop()
+        end
+    end
 
     if not scrollChild or not header then return end
 
@@ -380,98 +405,116 @@ function PSK:RefreshLogList()
         child:SetParent(nil)
     end
 
+    PSK.RowPool = PSK.RowPool or {}
+    PSK.RowPool[scrollChild] = PSK.RowPool[scrollChild] or {}
+    local pool = PSK.RowPool[scrollChild]
+
     local yOffset = -5
-    for index = #PSKDB.LootLogs, 1, -1 do -- newest first
+    for index = #PSKDB.LootLogs, 1, -1 do
         local log = PSKDB.LootLogs[index]
+        local rowIndex = #PSKDB.LootLogs - index + 1
 
-        local row = CreateFrame("Frame", nil, scrollChild)
-        row:SetSize(650, 20)
+        local row = pool[rowIndex]
+        if not row then
+            row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
+            row:SetSize(650, 20)
+            pool[rowIndex] = row
+        end
+
+        row:SetParent(scrollChild)
+        row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, yOffset)
+        row:Show()
 
-        -- Class icon
-		local classIcon = row:CreateTexture(nil, "ARTWORK")
-		classIcon:SetSize(16, 16)
-		classIcon:SetPoint("LEFT", row, "LEFT", 5, 0)
+        -- Class Icon
+        if not row.classIcon then
+            row.classIcon = row:CreateTexture(nil, "ARTWORK")
+            row.classIcon:SetSize(16, 16)
+            row.classIcon:SetPoint("LEFT", row, "LEFT", 5, 0)
+        end
+        if log.class then
+            local class = log.class:upper()
+            local texCoord = CLASS_ICON_TCOORDS[class]
+            if texCoord then
+                row.classIcon:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CharacterCreate-Classes")
+                row.classIcon:SetTexCoord(unpack(texCoord))
+            else
+                row.classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+                row.classIcon:SetTexCoord(0, 1, 0, 1)
+            end
+        else
+            row.classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            row.classIcon:SetTexCoord(0, 1, 0, 1)
+        end
 
-		if log.class then
-			local class = log.class:upper()
-			local texCoord = CLASS_ICON_TCOORDS[class]
-			if texCoord then
-				classIcon:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CharacterCreate-Classes")
-				classIcon:SetTexCoord(unpack(texCoord))
-			else
-				classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-			end
-		else
-			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-		end
+        -- Player Name
+        if not row.playerText then
+            row.playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.playerText:SetPoint("LEFT", row.classIcon, "RIGHT", 5, 0)
+        end
+        local playerClass = log.class and log.class:upper() or "SHAMAN"
+        local classColor = RAID_CLASS_COLORS[playerClass] or { r = 1, g = 1, b = 1 }
+        row.playerText:SetText(log.player)
+        row.playerText:SetTextColor(classColor.r, classColor.g, classColor.b)
 
-		-- Player Name
-		local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		playerText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
+        -- Fetch item icon if missing
+        if not log.itemTexture and log.itemLink then
+            local _, _, _, _, _, _, _, _, _, fetchedIcon = GetItemInfo(log.itemLink)
+            log.itemTexture = fetchedIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
+        end
 
-		-- Get the correct class color
-		local playerClass = log.class and log.class:upper() or "SHAMAN"
-		local classColor = RAID_CLASS_COLORS[playerClass] or { r = 1, g = 1, b = 1 }
+        -- Item icon
+        if not row.iconTexture then
+            row.iconTexture = row:CreateTexture(nil, "ARTWORK")
+            row.iconTexture:SetSize(16, 16)
+            row.iconTexture:SetPoint("LEFT", row.playerText, "RIGHT", 6, 0)
+        end
+        row.iconTexture:SetTexture(log.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
 
-		-- Apply the color to the player name
-		playerText:SetText(log.player)
-		playerText:SetTextColor(classColor.r, classColor.g, classColor.b)
+        -- Item text
+        if not row.itemText then
+            row.itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.itemText:SetPoint("LEFT", row.iconTexture, "RIGHT", 6, 0)
 
+            row.itemText:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(row.itemText, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink(row.itemLink or "")
+                GameTooltip:Show()
+            end)
+            row.itemText:SetScript("OnLeave", GameTooltip_Hide)
+        end
 
-		-- Get the item texture if it wasn't recorded earlier.
-		if not log.itemTexture and log.itemLink then
-			local _, _, _, _, _, _, _, _, _, fetchedIcon = GetItemInfo(log.itemLink)
-			log.itemTexture = fetchedIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
-		end
-
-		
-		-- Item icon
-		local iconTexture = row:CreateTexture(nil, "ARTWORK")
-		iconTexture:SetSize(16, 16)
-		iconTexture:SetPoint("LEFT", playerText, "RIGHT", 6, 0)
-		iconTexture:SetTexture(log.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
-
-		-- Item link
-		local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		itemText:SetPoint("LEFT", iconTexture, "RIGHT", 6, 0)
-		
-		local itemName, _, itemRarity = GetItemInfo(log.itemLink)
-		local r, g, b = 1, 1, 1 -- fallback white
-
-		if itemRarity then
-			r, g, b = GetItemQualityColor(itemRarity)
-		end
-
-		itemText:SetText(itemName or log.itemLink)
-		itemText:SetTextColor(r, g, b)
-
-		itemText:SetScript("OnEnter", function()
-			GameTooltip:SetOwner(itemText, "ANCHOR_RIGHT")
-			GameTooltip:SetHyperlink(log.itemLink)
-			GameTooltip:Show()
-		end)
-
-		itemText:SetScript("OnLeave", function()
-			GameTooltip:Hide()
-		end)
+        local itemName, _, itemRarity = GetItemInfo(log.itemLink)
+        local r, g, b = 1, 1, 1
+        if itemRarity then
+            r, g, b = GetItemQualityColor(itemRarity)
+        end
+        row.itemText:SetText(itemName or log.itemLink)
+        row.itemText:SetTextColor(r, g, b)
+        row.itemLink = log.itemLink
 
         -- Timestamp
-        local timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        timeText:SetPoint("LEFT", row, "LEFT", 480, 0)
-        timeText:SetText(log.timestamp)
+        if not row.timeText then
+            row.timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.timeText:SetPoint("LEFT", row, "LEFT", 480, 0)
+        end
+        row.timeText:SetText(log.timestamp)
 
         yOffset = yOffset - 22
     end
 
-    -- Optional header update
+    -- Hide unused rows
+    for i = #PSKDB.LootLogs + 1, #pool do
+        if pool[i] then pool[i]:Hide() end
+    end
+
     if header then
         header:SetText("Loot Logs (" .. #PSKDB.LootLogs .. ")")
     end
-	
-	-- Broadcast update
-	-- PSK:BroadcastUpdate("RefreshLogList")
+
+    -- PSK:BroadcastUpdate("RefreshLogList")
 end
+
 
 
 ----------------------------------------
@@ -516,16 +559,24 @@ function PSK:RefreshPlayerList()
 
     local yOffset = -5
     for index, name in ipairs(names) do
-        local row = CreateFrame("Button", nil, scrollChild)
-        row:SetSize(200, 20)
-        row:SetPoint("TOPLEFT", 0, yOffset)
 
-        -- Background for status glow
-        row.bg = row:CreateTexture(nil, "BACKGROUND")
-        row.bg:SetAllPoints()
-        row.bg:SetColorTexture(0, 0.5, 1, 0.15)  -- Light blue for selection
-        row.bg:Hide()
-
+		local row = PSK:GetOrCreateRow(index, scrollChild, "Player")
+		
+		-- row:SetParent(scrollChild)
+		row:ClearAllPoints()
+		row:SetSize(200, 20)
+		row:SetPoint("TOPLEFT", 0, yOffset)
+		row:Show()
+	
+		-- Background for status glow
+		if not row.bg then
+			row.bg = row:CreateTexture(nil, "BACKGROUND")
+			row.bg:SetAllPoints()
+			row.bg:SetColorTexture(0, 0.5, 1, 0.15)  -- Light blue for selection
+		end
+		
+		row.bg:Hide()		
+		
         -- Pull real player info
         local playerData = PSKDB.Players and PSKDB.Players[name]
         local class = (playerData and playerData.class) or "SHAMAN"
@@ -533,41 +584,39 @@ function PSK:RefreshPlayerList()
         local inRaid = (playerData and playerData.inRaid) or false
         local level = (playerData and playerData.level) or "???"
         local zone = (playerData and playerData.zone) or "???"
-		-- local fileClass = CLASS_NAME_TO_FILE[class] or "SHAMAN"
 
         row.playerData = {
             class = class,
             online = online,
             inRaid = inRaid,
             name = name,
-            level = level,
-            zone = zone,
+            level = playerData and playerData.level or "???",
+			zone = playerData and playerData.zone or "???"
         }
 
         -- Position
-        local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        posText:SetPoint("LEFT", row, "LEFT", 5, 0)
-        posText:SetText(index)
+		if not row.posText then
+			row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+			row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
+		end
+		row.posText:SetText(index)
 
         -- Class icon
-        local classIcon = row:CreateTexture(nil, "ARTWORK")
-        classIcon:SetSize(16, 16)
-        classIcon:SetPoint("LEFT", posText, "RIGHT", 8, 0)
+		if not row.classIcon then
+			row.classIcon = row:CreateTexture(nil, "ARTWORK")
+			row.classIcon:SetSize(16, 16)
+			row.classIcon:SetPoint("LEFT", row.posText, "RIGHT", 8, 0)
+		end
 		
-        -- classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-        -- if CLASS_ICON_TCOORDS[class] then
-            -- classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
-        -- end
 		if CLASS_ICON_TCOORDS[class] then
-			classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-			classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+			row.classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+			row.classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
 		else
-			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-			classIcon:SetTexCoord(0, 1, 0, 1)
+			row.classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			row.classIcon:SetTexCoord(0, 1, 0, 1)
 		end
 
-
-
+		
 		-- Extract the player class
 		local playerClass = playerData and playerData.class or "SHAMAN"
 		local fileClass = string.upper(playerClass)
@@ -576,33 +625,39 @@ function PSK:RefreshPlayerList()
 		local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
 
 		-- Create the player name text with the correct color
-		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
-		nameText:SetText(name)
-
-		-- Apply the correct class color
-		nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
+		if not row.nameText then
+			row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+			row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 8, 0)
+		end
+		row.nameText:SetText(name)
+		row.nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
 
 		-- Status
-        local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        statusText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
-
-        if inRaid then
-            statusText:SetText("In Raid")
-            statusText:SetTextColor(1, 0.5, 0)
-            row.bg:Show()
-        elseif online then
-            statusText:SetText("Online")
-            statusText:SetTextColor(0, 1, 0)
-            row.bg:Hide()
-        else
-            statusText:SetText("Offline")
-            statusText:SetTextColor(0.5, 0.5, 0.5)
-            row.bg:Hide()
-            nameText:SetAlpha(0.5)
-            classIcon:SetAlpha(0.5)
-        end
-
+		if not row.statusText then
+			row.statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			row.statusText:SetPoint("LEFT", row.nameText, "RIGHT", 10, 0)
+		end
+		
+		if inRaid then
+			row.statusText:SetText("In Raid")
+			row.statusText:SetTextColor(1, 0.5, 0)
+			row.nameText:SetAlpha(1)
+			row.classIcon:SetAlpha(1)
+			row.bg:Show()
+		elseif online then
+			row.statusText:SetText("Online")
+			row.statusText:SetTextColor(0, 1, 0)
+			row.nameText:SetAlpha(1)
+			row.classIcon:SetAlpha(1)
+			row.bg:Hide()
+		else
+			row.statusText:SetText("Offline")
+			row.statusText:SetTextColor(0.5, 0.5, 0.5)
+			row.bg:Hide()
+			row.nameText:SetAlpha(0.5)
+			row.classIcon:SetAlpha(0.5)
+		end
+		
         -- Click to select row
         row:SetScript("OnClick", function()
             PSK.SelectedPlayerRow = index
@@ -671,28 +726,40 @@ function PSK:RefreshPlayerList()
         end
 
         -- Tooltip
-        row:SetScript("OnEnter", function(self)
-            if self.playerData then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:ClearLines()
-                local tcoords = CLASS_ICON_TCOORDS[class]
-                if tcoords then
-                    local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
-                        tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
-                    GameTooltip:AddLine(icon .. self.playerData.name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
-                else
-                    GameTooltip:AddLine(self.playerData.name or "Unknown")
-                end
+		if not row.tooltipBound then
+			row:SetScript("OnEnter", function(self)
+				if self.playerData then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:ClearLines()
+					local tcoords = CLASS_ICON_TCOORDS[class]
+					if tcoords then
+						local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
+							tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
+						GameTooltip:AddLine(icon .. self.playerData.name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
+					else
+						GameTooltip:AddLine(self.playerData.name or "Unknown")
+					end
 
-                GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
-                GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
-                GameTooltip:Show()
-            end
-        end)
-        row:SetScript("OnLeave", GameTooltip_Hide)
-
+					GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
+					GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
+					GameTooltip:Show()
+				end
+			end)
+			row:SetScript("OnLeave", GameTooltip_Hide)
+			
+			row.tooltipBound = true
+		end 
+		
         yOffset = yOffset - 22
     end
+	
+	-- Hide unused rows in the pool
+	local pool = PSK.RowPool[scrollChild] or {}
+	for i = #names + 1, #pool do
+		if pool[i] then
+			pool[i]:Hide()
+		end
+	end
 	
 	-- Broadcast update
 	-- PSK:BroadcastUpdate("RefreshPlayerList")
@@ -982,199 +1049,208 @@ function PSK:RefreshBidList()
     local header = PSK.Headers.Bid
     if not scrollChild or not header then return end
 
-    -- Update header
+    PSK.RowPool = PSK.RowPool or {}
+    PSK.RowPool[scrollChild] = PSK.RowPool[scrollChild] or {}
+    local pool = PSK.RowPool[scrollChild]
+
     local bidCount = #PSK.BidEntries
     header:SetText("Bids (" .. bidCount .. ")")
 
-    -- Wipe list
+    -- Wipe visible list
     for _, child in ipairs({scrollChild:GetChildren()}) do
         child:Hide()
         child:SetParent(nil)
     end
 
-	-- Sort bidder table
-	table.sort(PSK.BidEntries, function(a, b)
-		local indexA = indexMap[a] or math.huge
-		local indexB = indexMap[b] or math.huge
-		
-		return indexA < indexB
-	end)
+    -- Sort by position (assumes indexMap is defined elsewhere)
+    table.sort(PSK.BidEntries, function(a, b)
+        local indexA = indexMap[a] or math.huge
+        local indexB = indexMap[b] or math.huge
+        return indexA < indexB
+    end)
 
-	-- Start displaying rows
     local yOffset = -5
     for index, bidData in ipairs(PSK.BidEntries) do
-        local row = CreateFrame("Button", nil, scrollChild)
-		row.bg = row:CreateTexture(nil, "BACKGROUND")
-		row.bg:SetAllPoints()
-		row.bg:SetColorTexture(0, 0, 0, 0) -- Transparent by default
-		row.bg:Hide()
+        local row = pool[index]
+        if not row then
+            row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
+            row:SetSize(220, 20)
+            row:SetFrameLevel(scrollChild:GetFrameLevel() + 1)
+            pool[index] = row
+        end
 
-        row:SetSize(220, 20)
+        row:SetParent(scrollChild)
+        row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, yOffset)
+        row:Show()
+
+        -- Background
+        if not row.bg then
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetAllPoints()
+        end
+        row.bg:SetColorTexture(0, 0, 0, 0)
+        row.bg:Hide()
+
         row:EnableMouse(true)
 
-        -- Position number
-        local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        posText:SetPoint("LEFT", row, "LEFT", 5, 0)
-        posText:SetText(bidData.position)
+        -- Position
+        if not row.posText then
+            row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
+        end
+        row.posText:SetText(bidData.position)
 
         -- Class Icon
         local class = bidData.class or "SHAMAN"
-        local classIcon = row:CreateTexture(nil, "ARTWORK")
-        classIcon:SetSize(16, 16)
-        classIcon:SetPoint("LEFT", posText, "RIGHT", 4, 0)
-        classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+        if not row.classIcon then
+            row.classIcon = row:CreateTexture(nil, "ARTWORK")
+            row.classIcon:SetSize(16, 16)
+            row.classIcon:SetPoint("LEFT", row.posText, "RIGHT", 4, 0)
+        end
         if CLASS_ICON_TCOORDS[class] then
-            classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+            row.classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+            row.classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
         end
 
         -- Name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", classIcon, "RIGHT", 4, 0)
-        nameText:SetText(bidData.name)
+        if not row.nameText then
+            row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 4, 0)
+        end
+        row.nameText:SetText(bidData.name)
 
-		-- Not in List Icon
-        if bidData.notListed then
-            local warningIcon = row:CreateTexture(nil, "OVERLAY")
-            warningIcon:SetSize(16, 16)
-            warningIcon:SetPoint("LEFT", nameText, "RIGHT", 8, 0)
-            warningIcon:SetTexture("Interface\\Common\\UI-StopButton")
+        -- Warning Icon
+        if bidData.notListed and not row.warningIcon then
+            row.warningIcon = row:CreateTexture(nil, "OVERLAY")
+            row.warningIcon:SetSize(16, 16)
+            row.warningIcon:SetPoint("LEFT", row.nameText, "RIGHT", 8, 0)
+            row.warningIcon:SetTexture("Interface\\Common\\UI-StopButton")
 
-            warningIcon:SetScript("OnEnter", function()
+            row.warningIcon:SetScript("OnEnter", function()
                 GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
                 GameTooltip:SetText(bidData.name, 1, 0.2, 0.2)
                 GameTooltip:AddLine("This player is not in the Main or Tier lists.", 1, 0.7, 0.2)
                 GameTooltip:Show()
             end)
+            row.warningIcon:SetScript("OnLeave", GameTooltip_Hide)
 
-            warningIcon:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
-
-            -- Add glowing pulse
             local pulse = row:CreateAnimationGroup()
             local fadeOut = pulse:CreateAnimation("Alpha")
             fadeOut:SetFromAlpha(0.8)
             fadeOut:SetToAlpha(0.4)
             fadeOut:SetDuration(0.5)
             fadeOut:SetOrder(1)
-
             local fadeIn = pulse:CreateAnimation("Alpha")
             fadeIn:SetFromAlpha(0.4)
             fadeIn:SetToAlpha(0.8)
             fadeIn:SetDuration(0.5)
             fadeIn:SetOrder(2)
-
             pulse:SetLooping("REPEAT")
             pulse:Play()
 
-            row.bg:SetColorTexture(1, 0, 0, 0.2) -- Light red background
+            row.bg:SetColorTexture(1, 0, 0, 0.2)
             row.bg:Show()
         end
-		
-		-- Award Button (to the right of the name)
-		local awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		awardButton:SetSize(16, 16)
-		awardButton:SetPoint("LEFT", nameText, "RIGHT", 30, 0)
-		awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
-		awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		awardButton.index = index
-		awardButton:SetText("")
-		awardButton:SetFrameLevel(row:GetFrameLevel() + 1)
-		awardButton:SetScript("OnClick", function(self)
-			if self.index then
-				local row = self:GetParent()
-				if row and row.bg then
-					row.bg:SetColorTexture(0, 1, 0, 0.4) -- bright green
-					local pulse = row:CreateAnimationGroup()
-					local fadeOut = pulse:CreateAnimation("Alpha")
-					fadeOut:SetFromAlpha(1)
-					fadeOut:SetToAlpha(0)
-					fadeOut:SetDuration(0.4)
-					fadeOut:SetOrder(1)
-					local fadeIn = pulse:CreateAnimation("Alpha")
-					fadeIn:SetFromAlpha(0)
-					fadeIn:SetToAlpha(1)
-					fadeIn:SetDuration(0.4)
-					fadeIn:SetOrder(2)
-					pulse:SetLooping("NONE")
-					pulse:Play()
-				end
-				AwardPlayer(self.index)
-			end
-		end)
-		
-		awardButton:SetScript("OnEnter", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:SetColorTexture(0.2, 1, 0.2, 0.25)
 
-				row.bg:Show()
-			end
+        -- Award Button
+        if not row.awardButton then
+            row.awardButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            row.awardButton:SetSize(16, 16)
+            row.awardButton:SetPoint("LEFT", row.nameText, "RIGHT", 30, 0)
+            row.awardButton:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Check")
+            row.awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
+            row.awardButton:SetText("")
+        end
+        row.awardButton.index = index
+        row.awardButton:SetScript("OnClick", function(self)
+            local row = self:GetParent()
+            if row and row.bg then
+                row.bg:SetColorTexture(0, 1, 0, 0.4)
+                local pulse = row:CreateAnimationGroup()
+                local fadeOut = pulse:CreateAnimation("Alpha")
+                fadeOut:SetFromAlpha(1)
+                fadeOut:SetToAlpha(0)
+                fadeOut:SetDuration(0.4)
+                fadeOut:SetOrder(1)
+                local fadeIn = pulse:CreateAnimation("Alpha")
+                fadeIn:SetFromAlpha(0)
+                fadeIn:SetToAlpha(1)
+                fadeIn:SetDuration(0.4)
+                fadeIn:SetOrder(2)
+                pulse:SetLooping("NONE")
+                pulse:Play()
+            end
+            AwardPlayer(self.index)
+        end)
+        row.awardButton:SetScript("OnEnter", function(self)
+            local row = self:GetParent()
+            if row and row.bg then
+                row.bg:SetColorTexture(0.2, 1, 0.2, 0.25)
+                row.bg:Show()
+            end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Award Loot", 1, 1, 1)
+            GameTooltip:AddLine("Click to award loot to this player.", 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        row.awardButton:SetScript("OnLeave", function(self)
+            local row = self:GetParent()
+            if row and row.bg then
+                row.bg:Hide()
+            end
+            GameTooltip:Hide()
+        end)
 
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Award Loot", 1, 1, 1)
-			GameTooltip:AddLine("Click to award loot to this player.", 0.8, 0.8, 0.8)
-			GameTooltip:Show()
-		end)
+        -- Pass Button
+        if not row.passButton then
+            row.passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            row.passButton:SetSize(16, 16)
+            row.passButton:SetPoint("LEFT", row.awardButton, "RIGHT", 15, 0)
 
-		awardButton:SetScript("OnLeave", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:Hide()
-			end
-			GameTooltip:Hide()
-		end)
+            local passTexture = row.passButton:CreateTexture(nil, "ARTWORK")
+            passTexture:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+            passTexture:SetAllPoints(row.passButton)
+            passTexture:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+            row.passButton:SetNormalTexture(passTexture)
 
-
-		-- Pass Button (to the right of Award)
-		local passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		passButton:SetSize(16, 16)
-		passButton:SetPoint("LEFT", awardButton, "RIGHT", 15, 0)
-		passButton:SetFrameLevel(row:GetFrameLevel() + 1)
-
-		local passTexture = passButton:CreateTexture(nil, "ARTWORK")
-		passTexture:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-		passTexture:SetAllPoints(passButton)
-		passTexture:SetTexCoord(0.2, 0.8, 0.2, 0.8)
-		passButton:SetNormalTexture(passTexture)
-
-		passButton.index = index
-		passButton:SetText("")
-		passButton:SetScript("OnClick", function(self)
-			if self.index then
-				table.remove(PSK.BidEntries, self.index)
-				PSK:RefreshBidList()
-			end
-		end)
-	
-		passButton:SetScript("OnEnter", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:SetColorTexture(1, 0.2, 0.2, 0.25)
-				row.bg:Show()
-			end
-
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Pass on Loot", 1, 1, 1)
-			GameTooltip:AddLine("Click to remove this player from bidding.", 0.8, 0.8, 0.8)
-			GameTooltip:Show()
-		end)
-
-		passButton:SetScript("OnLeave", function(self)
-			local row = self:GetParent()
-			if row and row.bg then
-				row.bg:Hide()
-			end
-			GameTooltip:Hide()
-		end)
+            row.passButton:SetText("")
+        end
+        row.passButton.index = index
+        row.passButton:SetScript("OnClick", function(self)
+            if self.index then
+                table.remove(PSK.BidEntries, self.index)
+                PSK:RefreshBidList()
+            end
+        end)
+        row.passButton:SetScript("OnEnter", function(self)
+            local row = self:GetParent()
+            if row and row.bg then
+                row.bg:SetColorTexture(1, 0.2, 0.2, 0.25)
+                row.bg:Show()
+            end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Pass on Loot", 1, 1, 1)
+            GameTooltip:AddLine("Click to remove this player from bidding.", 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        row.passButton:SetScript("OnLeave", function(self)
+            local row = self:GetParent()
+            if row and row.bg then
+                row.bg:Hide()
+            end
+            GameTooltip:Hide()
+        end)
 
         yOffset = yOffset - 22
     end
-	
-	-- Broadcast update
-	-- PSK:BroadcastUpdate("RefreshBidList")
+
+    -- Hide unused bid rows
+    for i = #PSK.BidEntries + 1, #pool do
+        if pool[i] then pool[i]:Hide() end
+    end
 end
+
 
 ----------------------------------------
 -- Get Loot Threshold
@@ -1367,12 +1443,85 @@ function PSK:RefreshGroupMemberData()
     end
 end
 
+
+------------------------------------------------
+-- Function to enable reusing of rows
+-- This should prevent redrawing every refresh
+------------------------------------------------
+
+function PSK:GetOrCreateRow(index, parent, rowType)
+    PSK.RowPool = PSK.RowPool or {}
+    PSK.RowPool[parent] = PSK.RowPool[parent] or {}
+    local pool = PSK.RowPool[parent]
+
+    local row = pool[index]
+    if not row then
+        row = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        row:SetSize(650, 20)
+        row:SetFrameLevel(parent:GetFrameLevel() + 1)
+
+        -- Background
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        row.bg:SetColorTexture(0, 0, 0, 0)
+        row.bg:Hide()
+
+        pool[index] = row
+    end
+
+	if row:GetParent() ~= parent then
+		row:SetParent(parent)
+	end
+
+    -- Log rows setup
+    if rowType == "Log" and not row.classIcon then
+        row.classIcon = row:CreateTexture(nil, "ARTWORK")
+        row.classIcon:SetSize(16, 16)
+        row.classIcon:SetPoint("LEFT", row, "LEFT", 5, 0)
+
+        row.playerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.playerText:SetPoint("LEFT", row.classIcon, "RIGHT", 5, 0)
+
+        row.iconTexture = row:CreateTexture(nil, "ARTWORK")
+        row.iconTexture:SetSize(16, 16)
+        row.iconTexture:SetPoint("LEFT", row.playerText, "RIGHT", 6, 0)
+
+        row.itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.itemText:SetPoint("LEFT", row.iconTexture, "RIGHT", 6, 0)
+
+        row.timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.timeText:SetPoint("LEFT", row, "LEFT", 480, 0)
+    end
+
+    -- Player/Bid rows setup (minimal setup here; add more as needed)
+    if rowType == "Player" and not row.posText then
+        row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
+
+        row.classIcon = row:CreateTexture(nil, "ARTWORK")
+        row.classIcon:SetSize(16, 16)
+        row.classIcon:SetPoint("LEFT", row.posText, "RIGHT", 8, 0)
+
+        row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 8, 0)
+
+        row.statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.statusText:SetPoint("LEFT", row.nameText, "RIGHT", 10, 0)
+    end
+
+    return row
+end
+
+
+
+
+
 -------------------------------------------
 -- Serialize Data
 -------------------------------------------
 
-function PSK:Serialize(tbl)
-	return table.concat( { tbl.type, tbl.timestamp }, "|")
+-- function PSK:Serialize(tbl)
+	-- return table.concat( { tbl.type, tbl.timestamp }, "|")
 
 
 -------------------------------------------
