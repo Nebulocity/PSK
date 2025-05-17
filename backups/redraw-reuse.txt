@@ -1,0 +1,19 @@
+if not row.posText then
+    row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
+end
+row.posText:SetText(index)
+
+if not row.classIcon then
+    row.classIcon = row:CreateTexture(nil, "ARTWORK")
+    row.classIcon:SetSize(16, 16)
+    row.classIcon:SetPoint("LEFT", row.posText, "RIGHT", 8, 0)
+end
+row.classIcon:SetTexture(...)
+row.classIcon:SetTexCoord(...)
+
+if not row.nameText then
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 8, 0)
+end
+row.nameText:SetText(name)

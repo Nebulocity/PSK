@@ -1,0 +1,112 @@
+function PSK:RefreshLootList()
+    if not PSKDB.LootLogs then return end
+
+    local scrollChild = PSK.ScrollChildren.Loot
+    local header = PSK.Headers.Loot
+    if not scrollChild or not header then return end
+
+    -- Clear previous children
+    for _, child in ipairs({scrollChild:GetChildren()}) do
+        child:Hide()
+        child:SetParent(nil)
+    end
+
+    if PSK.RecordingWarningDrops then
+        if not PSK.LootRecordingActive then
+            PSK.RecordingWarningDrops:Show()
+            if not PSK.RecordingWarningDrops.pulse:IsPlaying() then
+                PSK.RecordingWarningDrops.pulse:Play()
+            end
+        else
+            PSK.RecordingWarningDrops:Hide()
+            PSK.RecordingWarningDrops.pulse:Stop()
+        end
+    end
+
+    if PSK.RecordingWarningLogs then
+        if not PSK.LootRecordingActive then
+            PSK.RecordingWarningLogs:Show()
+            if not PSK.RecordingWarningLogs.pulse:IsPlaying() then
+                PSK.RecordingWarningLogs.pulse:Play()
+            end
+        else
+            PSK.RecordingWarningLogs:Hide()
+            PSK.RecordingWarningLogs.pulse:Stop()
+        end
+    end
+
+    local yOffset = -5
+
+    for index, loot in ipairs(PSKGlobal.LootDrops) do
+        local row = CreateFrame("Button", nil, scrollChild)
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        row.bg:SetColorTexture(0, 0, 0, 0)
+        row:SetSize(240, 20)
+        row:SetPoint("TOP", 30, yOffset)
+
+        local iconTexture = row:CreateTexture(nil, "ARTWORK")
+        iconTexture:SetSize(16, 16)
+        iconTexture:SetPoint("LEFT", row, "LEFT", 5, 0)
+        iconTexture:SetTexture(loot.itemTexture)
+
+        -- Make row clickable and show tooltip
+        row:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(loot.itemLink)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        row:SetScript("OnClick", function()
+            if PSK.SelectedLootRow and PSK.SelectedLootRow.bg then
+                PSK.SelectedLootRow.bg:SetColorTexture(0, 0, 0, 0)
+            end
+            row.bg:SetColorTexture(0.2, 0.6, 1, 0.2)
+            PSK.SelectedLootRow = row
+            PSK.SelectedItem = loot.itemLink
+            PSK.SelectedItemData = loot  -- Store the full loot item data
+            PSK.BidButton:Enable()
+            print("[PSK] Selected item for bidding: " .. loot.itemLink)
+
+            -- Pulse animation
+            local pulse = row:CreateAnimationGroup()
+            local fadeOut = pulse:CreateAnimation("Alpha")
+            fadeOut:SetFromAlpha(1)
+            fadeOut:SetToAlpha(0.4)
+            fadeOut:SetDuration(0.2)
+            fadeOut:SetOrder(1)
+
+            local fadeIn = pulse:CreateAnimation("Alpha")
+            fadeIn:SetFromAlpha(0.4)
+            fadeIn:SetToAlpha(1)
+            fadeIn:SetDuration(0.2)
+            fadeIn:SetOrder(2)
+
+            pulse:SetLooping("NONE")
+            pulse:Play()
+        end)
+
+        -- Add the FontString for visual text
+        local itemText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        itemText:SetPoint("LEFT", iconTexture, "RIGHT", 8, 0)
+        itemText:SetText(loot.itemLink)
+
+        yOffset = yOffset - 22
+    end
+
+    -- Update header
+    local threshold = PSK.Settings.lootThreshold or 3
+    local rarityNames = {
+        [0] = "Poor", [1] = "Common", [2] = "Uncommon",
+        [3] = "Rare", [4] = "Epic", [5] = "Legendary"
+    }
+    local rarityName = rarityNames[threshold] or "?"
+    -- header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
+	header:SetText("Loot Drops")
+	
+	-- Broadcast update
+	-- PSK:BroadcastUpdate("RefreshLootList")
+end

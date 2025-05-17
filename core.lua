@@ -229,7 +229,7 @@ function PSK:StartBidding()
 	local itemName = GetItemInfo(itemLink) or itemLink
 	
     -- Use the full item link for clickable text
-    Announce("[PSK] Bidding has started for " .. itemLink .. "! 15 seconds remaining.")
+	SendChatMessage("[PSK] Bidding has started for " .. itemLink .. "! 20 seconds remaining.", "RAID_WARNING")
 	Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
 	Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
 	Announce("[PSK] -----------------------------------------------------------------")
@@ -261,9 +261,9 @@ function PSK:CloseBidding()
     PSK:RefreshBidList()
 
     if #PSK.BidEntries == 0 then
-        Announce("[PSK] No bids were placed.")
+		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
     else
-        Announce("[PSK] Bidding closed. Bidders:")
+		SendChatMessage("[PSK] Bidding closed. Bidders:", "RAID_WARNING")
         for _, entry in ipairs(PSK.BidEntries) do
             local line = string.format("[PSK] %d. %s", entry.position, entry.name)
             Announce(line)
