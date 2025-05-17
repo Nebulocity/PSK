@@ -1,0 +1,213 @@
+function PSK:RefreshPlayerList()
+
+	if InCombatLockdown() then
+		if PSK.EventFrame and PSK.EventFrame.RegisterEvent then
+			PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+		return
+	end
+
+	
+    if not PSKDB or not PSK.CurrentList then return end
+	
+	-- Ensure the player data is up to date
+	PSK:UpdatePlayerData()
+
+
+    local scrollChild = PSK.ScrollChildren.Main
+    local header = PSK.Headers.Main
+    if not scrollChild or not header then return end
+
+    -- Clear previous list
+    for _, child in ipairs({scrollChild:GetChildren()}) do
+        child:Hide()
+        child:SetParent(nil)
+    end
+
+    local names = {}
+    if PSK.CurrentList == "Main" and PSKDB.MainList then
+        names = PSKDB.MainList
+    elseif PSK.CurrentList == "Tier" and PSKDB.TierList then
+        names = PSKDB.TierList
+    end
+
+    -- Update header text
+    header:SetText((PSK.CurrentList == "Main" and "PSK Main" or "PSK Tier") .. " (" .. #names .. ")")
+
+    local yOffset = -5
+    for index, name in ipairs(names) do
+        local row = CreateFrame("Button", nil, scrollChild)
+        row:SetSize(200, 20)
+        row:SetPoint("TOPLEFT", 0, yOffset)
+
+        -- Background for status glow
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        row.bg:SetColorTexture(0, 0.5, 1, 0.15)  -- Light blue for selection
+        row.bg:Hide()
+
+        -- Pull real player info
+        local playerData = PSKDB.Players and PSKDB.Players[name]
+        local class = (playerData and playerData.class) or "SHAMAN"
+        local online = (playerData and playerData.online) or false
+        local inRaid = (playerData and playerData.inRaid) or false
+        local level = (playerData and playerData.level) or "???"
+        local zone = (playerData and playerData.zone) or "???"
+		-- local fileClass = CLASS_NAME_TO_FILE[class] or "SHAMAN"
+
+        row.playerData = {
+            class = class,
+            online = online,
+            inRaid = inRaid,
+            name = name,
+            level = level,
+            zone = zone,
+        }
+
+        -- Position
+        local posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        posText:SetPoint("LEFT", row, "LEFT", 5, 0)
+        posText:SetText(index)
+
+        -- Class icon
+        local classIcon = row:CreateTexture(nil, "ARTWORK")
+        classIcon:SetSize(16, 16)
+        classIcon:SetPoint("LEFT", posText, "RIGHT", 8, 0)
+		
+		if CLASS_ICON_TCOORDS[class] then
+			classIcon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+			classIcon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+		else
+			classIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			classIcon:SetTexCoord(0, 1, 0, 1)
+		end
+
+		-- Extract the player class
+		local playerClass = playerData and playerData.class or "SHAMAN"
+		local fileClass = string.upper(playerClass)
+
+		-- Corrected class color lookup
+		local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
+
+		-- Create the player name text with the correct color
+		local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		nameText:SetPoint("LEFT", classIcon, "RIGHT", 8, 0)
+		nameText:SetText(name)
+
+		-- Apply the correct class color
+		nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
+
+		-- Status
+        local statusText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        statusText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
+
+        if inRaid then
+            statusText:SetText("In Raid")
+            statusText:SetTextColor(1, 0.5, 0)
+            row.bg:Show()
+        elseif online then
+            statusText:SetText("Online")
+            statusText:SetTextColor(0, 1, 0)
+            row.bg:Hide()
+        else
+            statusText:SetText("Offline")
+            statusText:SetTextColor(0.5, 0.5, 0.5)
+            row.bg:Hide()
+            nameText:SetAlpha(0.5)
+            classIcon:SetAlpha(0.5)
+        end
+
+        -- Click to select row
+        row:SetScript("OnClick", function()
+            PSK.SelectedPlayerRow = index
+            PSK.SelectedPlayer = name
+            PSK:RefreshPlayerList()
+        end)
+
+        -- Highlight the selected row
+        if PSK.SelectedPlayer == name then
+            row.bg:Show()
+
+            -- Add Up Arrow with Flash Animation
+			local upButton = CreateFrame("Button", nil, row)
+			upButton:SetSize(24, 24)
+			upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
+			upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+			upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+			upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+
+			upButton:SetScript("OnClick", function()
+				if index > 1 then
+					local movedName = table.remove(names, index)
+					table.insert(names, index - 1, movedName)
+					PSK.SelectedPlayer = movedName
+					PSK.SelectedPlayerRow = index - 1
+					PSK:RefreshPlayerList()
+
+					-- Flash effect
+					row.bg:SetColorTexture(0.2, 0.8, 0.2, 0.4)
+					C_Timer.After(0.1, function()
+						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
+					end)
+
+					-- Play sound
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end
+			end)
+
+
+            -- Add Down Arrow with Flash Animation
+			local downButton = CreateFrame("Button", nil, row)
+			downButton:SetSize(24, 24)
+			downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+			downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+			downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+			downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+
+			downButton:SetScript("OnClick", function()
+				if index < #names then
+					local movedName = table.remove(names, index)
+					table.insert(names, index + 1, movedName)
+					PSK.SelectedPlayer = movedName
+					PSK.SelectedPlayerRow = index + 1
+					PSK:RefreshPlayerList()
+
+					-- Flash effect
+					row.bg:SetColorTexture(0.8, 0.2, 0.2, 0.4)
+					C_Timer.After(0.1, function()
+						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
+					end)
+
+					-- Play sound
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end
+			end)
+        end
+
+        -- Tooltip
+        row:SetScript("OnEnter", function(self)
+            if self.playerData then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:ClearLines()
+                local tcoords = CLASS_ICON_TCOORDS[class]
+                if tcoords then
+                    local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
+                        tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
+                    GameTooltip:AddLine(icon .. self.playerData.name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
+                else
+                    GameTooltip:AddLine(self.playerData.name or "Unknown")
+                end
+
+                GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
+                GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
+                GameTooltip:Show()
+            end
+        end)
+        row:SetScript("OnLeave", GameTooltip_Hide)
+
+        yOffset = yOffset - 22
+    end
+	
+	-- Broadcast update
+	-- PSK:BroadcastUpdate("RefreshPlayerList")
+end
