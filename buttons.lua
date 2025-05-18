@@ -31,8 +31,8 @@ PSK.ToggleListButton:SetScript("OnClick", function()
 		PSK:PlayRandomPeonSound()
 	end
 
-    PSK:RefreshPlayerList()
-    PSK:RefreshBidList()
+    PSK:DebouncedRefreshPlayerList()
+    PSK:DebouncedRefreshBidList()
 	PSK:ClearSelection()
 end)
 

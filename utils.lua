@@ -4,7 +4,14 @@
 
 local PSK = select(2, ...)
 
--- Facilites row pools.
+-- Debounce flags
+local refreshPlayerScheduled = false
+local refreshBidScheduled = false
+local refreshLootScheduled = false
+local refreshLogScheduled = false
+local refreshAvailablePlayers = false
+
+-- Facilitates row pools.
 PSK.RowPool = PSK.RowPool or {}
 
 ---------------------------------------------------
@@ -110,7 +117,7 @@ function PerformAward(index)
             if not BiddingOpen then
                 PSK.BidButton:Disable()
             end
-            PSK:RefreshLootList()
+            PSK:DebouncedRefreshLootList()
         end)
 
         fade:Play()
@@ -120,7 +127,7 @@ function PerformAward(index)
         if not BiddingOpen then
             PSK.BidButton:Disable()
         end
-        PSK:RefreshLootList()
+        PSK:DebouncedRefreshLootList()
     end
 
     -- Remove from bids
@@ -158,11 +165,11 @@ function PerformAward(index)
     table.remove(PSKGlobal.LootDrops, index)
 
     if PSK.RefreshLogList then
-        PSK:RefreshLogList()
+        PSK:DebouncedRefreshLogList()
     end
 
-    PSK:RefreshPlayerList()
-    PSK:RefreshBidList()
+    PSK:DebouncedRefreshPlayerList()
+    PSK:DebouncedRefreshBidList()
     PlaySound(12867)
 end
 
@@ -195,9 +202,9 @@ function Announce(message)
 end
 
 
-----------------------------------------------
--- I CAN'T REMEMBER WHAT THIS FRAME IS FOR?
-----------------------------------------------
+---------------------------------------------------------
+-- Create scrollable list container with head/backdrop.
+---------------------------------------------------------
 
 function CreateBorderedScrollFrame(name, parent, x, y, titleText, customWidth)
     local COLUMN_WIDTH = customWidth or 220
@@ -662,7 +669,7 @@ function PSK:RefreshPlayerList()
         row:SetScript("OnClick", function()
             PSK.SelectedPlayerRow = index
             PSK.SelectedPlayer = name
-            PSK:RefreshPlayerList()
+            PSK:DebouncedRefreshPlayerList()
         end)
 
         -- Highlight the selected row
@@ -683,7 +690,7 @@ function PSK:RefreshPlayerList()
 					table.insert(names, index - 1, movedName)
 					PSK.SelectedPlayer = movedName
 					PSK.SelectedPlayerRow = index - 1
-					PSK:RefreshPlayerList()
+					PSK:DebouncedRefreshPlayerList()
 
 					-- Flash effect
 					row.bg:SetColorTexture(0.2, 0.8, 0.2, 0.4)
@@ -711,7 +718,7 @@ function PSK:RefreshPlayerList()
 					table.insert(names, index + 1, movedName)
 					PSK.SelectedPlayer = movedName
 					PSK.SelectedPlayerRow = index + 1
-					PSK:RefreshPlayerList()
+					PSK:DebouncedRefreshPlayerList()
 
 					-- Flash effect
 					row.bg:SetColorTexture(0.8, 0.2, 0.2, 0.4)
@@ -827,7 +834,7 @@ PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 -- Handle the event
 PSK.EventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_REGEN_ENABLED" then
-        PSK:RefreshPlayerList()
+        PSK:DebouncedRefreshPlayerList()
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
         print("[PSK] Player list updated after combat.")
     end
@@ -856,7 +863,7 @@ end
 -- Refresh the Available player lists
 ---------------------------------------------------
 
-function PSK:RefreshAvailableMembers()
+function PSK:RefreshAvailablePlayerList()
     -- Get the scroll children
     local mainChild = PSK.ScrollChildren.MainAvailable
     local tierChild = PSK.ScrollChildren.TierAvailable
@@ -915,8 +922,8 @@ function PSK:RefreshAvailableMembers()
         addButton:SetScript("OnClick", function()
             local list = (parent == mainChild) and PSKDB.MainList or PSKDB.TierList
             table.insert(list, player.name)
-            PSK:RefreshAvailableMembers()
-            PSK:RefreshPlayerList()
+            PSK:DebouncedRefreshAvailablePlayerList()
+            PSK:DebouncedRefreshPlayerList()
             print("[PSK] Added " .. player.name .. " to the " .. ((parent == mainChild) and "Main" or "Tier") .. " List.")
         end)
 
@@ -1220,7 +1227,7 @@ function PSK:RefreshBidList()
         row.passButton:SetScript("OnClick", function(self)
             if self.index then
                 table.remove(PSK.BidEntries, self.index)
-                PSK:RefreshBidList()
+                PSK:DebouncedRefreshBidList()
             end
         end)
         row.passButton:SetScript("OnEnter", function(self)
@@ -1366,7 +1373,7 @@ function PSK:ImportLists()
     end
 
     -- Update the UI
-    PSK:RefreshPlayerList()
+    PSK:DebouncedRefreshPlayerList()
     print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
 end
 
@@ -1427,7 +1434,7 @@ function PSK:RefreshGroupMemberData()
                 inRaid = inRaid,
             }
 
-            PSK:RefreshPlayerList()
+            PSK:DebouncedRefreshPlayerList()
         end
     end
 
@@ -1515,6 +1522,55 @@ end
 
 
 
+-------------------------------------------
+-- Refresh only after a short delay
+-------------------------------------------
+
+function PSK:DebouncedRefreshAvailablePlayerList()
+    if refreshAvailablePlayers then return end
+    refreshAvailablePlayers = true
+    C_Timer.After(0.5, function()
+        refreshAvailablePlayers = false
+        PSK:RefreshAvailablePlayerList()
+    end)
+end
+
+function PSK:DebouncedRefreshPlayerList()
+    if refreshPlayerScheduled then return end
+    refreshPlayerScheduled = true
+    C_Timer.After(0.5, function()
+        refreshPlayerScheduled = false
+        PSK:RefreshPlayerList()
+    end)
+end
+
+function PSK:DebouncedRefreshBidList()
+    if refreshBidScheduled then return end
+    refreshBidScheduled = true
+    C_Timer.After(0.5, function()
+        refreshBidScheduled = false
+        PSK:RefreshBidList()
+    end)
+end
+
+function PSK:DebouncedRefreshLootList()
+    if refreshLootScheduled then return end
+    refreshLootScheduled = true
+    C_Timer.After(0.5, function()
+        refreshLootScheduled = false
+        PSK:RefreshLootList()
+    end)
+end
+
+function PSK:DebouncedRefreshLogList()
+    if refreshLogScheduled then return end
+    refreshLogScheduled = true
+    C_Timer.After(0.5, function()
+        refreshLogScheduled = false
+        PSK:RefreshLogList()
+    end)
+end
+
 
 -------------------------------------------
 -- Serialize Data
@@ -1541,4 +1597,4 @@ end
 -- end
 
 
-PSK:RefreshLogList()
+PSK:DebouncedRefreshLogList()

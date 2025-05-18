@@ -439,7 +439,7 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
 	OnAccept = function()
 		wipe(PSKDB.LootDrops)
 		PSK.LootDrops = PSKDB.LootDrops
-		PSK:RefreshLootList()
+		PSK:DebouncedRefreshLootList()
 	end
 
 }
@@ -672,7 +672,7 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
         PSK.ContentFrame:Show()
     elseif tabID == 2 then
         PSK.ManageFrame:Show()
-        PSK:RefreshAvailableMembers()
+        PSK:DebouncedRefreshAvailablePlayerList()
     elseif tabID == 3 then
         PSK.SettingsFrame:Show()
     elseif tabID == 4 then
@@ -731,10 +731,10 @@ C_Timer.After(0.1, function()
     if PSK.RefreshLogList then
         PSK:UpdateLootThresholdLabel()
 		-- PSK:CreateImportExportSection()
-		PSK:RefreshLogList()
-		PSK:RefreshLootList()
-		PSK:RefreshPlayerList()
-		PSK:RefreshBidList()
+		PSK:DebouncedRefreshLogList()
+		PSK:DebouncedRefreshLootList()
+		PSK:DebouncedRefreshPlayerList()
+		PSK:DebouncedRefreshBidList()
     end
 end)
 

@@ -95,9 +95,9 @@ lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 							timestamp = date("%I:%M %p %m/%d/%Y")
 						})
 
-						PSK:RefreshLootList()
+						PSK:DebouncedRefreshLootList()
 						if PSK.RefreshLogList then
-							PSK:RefreshLogList()
+							PSK:DebouncedRefreshLogList()
 						end
 
 						print("[PSK] Master Looter viewed loot: " .. itemLink)
@@ -153,7 +153,7 @@ end)
                     -- timestamp = date("%I:%M %p %m/%d/%Y")
                 -- })
 
-                -- PSK:RefreshLootList()
+                -- PSK:DebouncedRefreshLootList()
 
                 -- if PSK.RefreshLogList then
                     -- PSK:RefreshLogList()
@@ -251,14 +251,14 @@ function PSK:StartBidding()
         end
     end)
 
-    PSK:RefreshBidList()
+    PSK:DebouncedRefreshBidList()
 end
 
 
 function PSK:CloseBidding()
     BiddingOpen = false
     PSK.BidButton:SetText("Start Bidding")
-    PSK:RefreshBidList()
+    PSK:DebouncedRefreshBidList()
 
     if #PSK.BidEntries == 0 then
 		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
@@ -275,38 +275,58 @@ end
 -- Auto-Refresh Player Lists on Events
 ----------------------------------------
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("PLAYER_LOGIN")
-eventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
-eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
-eventFrame:RegisterEvent("PARTY_MEMBER_ENABLE")
-eventFrame:RegisterEvent("PARTY_MEMBER_DISABLE")
-eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
-eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+-- local eventFrame = CreateFrame("Frame")
+-- eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+-- eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+-- eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+-- eventFrame:RegisterEvent("PLAYER_LOGIN")
+-- eventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
+-- eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+-- eventFrame:RegisterEvent("PARTY_MEMBER_ENABLE")
+-- eventFrame:RegisterEvent("PARTY_MEMBER_DISABLE")
+-- eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+-- eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 
-eventFrame:SetScript("OnEvent", function(self, event, ...)
-    -- Force a guild roster refresh
-    GuildRoster()
+PSK.EventFrame = CreateFrame("Frame")
+PSK.EventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+PSK.EventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
+PSK.EventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+PSK.EventFrame:RegisterEvent("LOOT_OPENED")
 
-    -- Update player data
-    PSK:UpdatePlayerData()
+-- eventFrame:SetScript("OnEvent", function(self, event, ...)
+    -- -- Force a guild roster refresh
+    -- GuildRoster()
 
-    -- Refresh lists
-    if PSK and PSK.RefreshAvailableMembers then
-        PSK:RefreshAvailableMembers()
-    end
+    -- -- Update player data
+    -- PSK:UpdatePlayerData()
+
+    -- -- Refresh lists
+    -- if PSK and PSK.RefreshAvailableMembers then
+        -- PSK:DebouncedRefreshAvailablePlayerList()
+    -- end
 	
-    if PSK and PSK.RefreshPlayerList then
-        PSK:RefreshPlayerList()
-    end
+    -- if PSK and PSK.RefreshPlayerList then
+        -- PSK:RefreshPlayerList()
+    -- end
 	
-	if event == "GROUP_ROSTER_UPDATE" then
-		PSK:RefreshGroupMemberData()
-	end
+	-- if event == "GROUP_ROSTER_UPDATE" then
+		-- PSK:RefreshGroupMemberData()
+	-- end
 
+-- end)
+
+PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
+
+    if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_FLAGS_CHANGED" then
+        PSK:DebouncedRefreshPlayerList()
+        PSK:DebouncedRefreshBidList()
+    elseif event == "GUILD_ROSTER_UPDATE" then
+		PSK:DebouncedRefreshAvailablePlayerList()
+        PSK:DebouncedRefreshPlayerList()
+    elseif event == "LOOT_OPENED" then
+        PSK:DebouncedRefreshLootList()
+        PSK:DebouncedRefreshLogList()
+    end
 end)
 
 print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
@@ -393,7 +413,7 @@ function AddBid(name)
         notListed = not playerInList,
     })
 
-    PSK:RefreshBidList()
+    PSK:DebouncedRefreshBidList()
 
     -- Print a warning if the player isn't in the lists
     if not playerInList then
@@ -412,7 +432,7 @@ function RetractBid(name)
     for i, entry in ipairs(PSK.BidEntries) do
         if entry.name == name then
             table.remove(PSK.BidEntries, i)
-            PSK:RefreshBidList()
+            PSK:DebouncedRefreshBidList()
             return
         end
     end
@@ -426,7 +446,7 @@ end
 function PSK:ClearSelection()
     PSK.SelectedPlayer = nil
     PSK.SelectedPlayerRow = nil
-    PSK:RefreshPlayerList()
+    PSK:DebouncedRefreshPlayerList()
 end
 
 
@@ -628,7 +648,7 @@ function PSK:RemovePlayerByScope(scope, rawName)
         print("[PSK] Could not find " .. nameProper .. " in the specified list(s).")
     end
 
-    PSK:RefreshPlayerList()
+    PSK:DebouncedRefreshPlayerList()
 end
 
 ------------------------------------------------
@@ -752,7 +772,7 @@ function PSK:AddPlayerFromCommand(name, listType, position)
     end
 
     print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
-    PSK:RefreshPlayerList()
+    PSK:DebouncedRefreshPlayerList()
 end
 
 
