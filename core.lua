@@ -229,7 +229,8 @@ function PSK:StartBidding()
 	local itemName = GetItemInfo(itemLink) or itemLink
 	
     -- Use the full item link for clickable text
-	SendChatMessage("[PSK] Bidding has started for " .. itemLink .. "! 20 seconds remaining.", "RAID_WARNING")
+	
+	SendChatMessage("[PSK] [" .. listName .. "] Bidding has started for " .. itemLink .. "! 20 seconds remaining.", "RAID_WARNING")
 	Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
 	Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
 	Announce("[PSK] -----------------------------------------------------------------")
@@ -277,14 +278,25 @@ function PSK:CloseBidding()
 			return aIndex < bIndex
 		end)
 
+		-- for i, entry in ipairs(PSK.BidEntries) do
+			-- local listPos = indexMap[entry.name]
+			-- if listPos then
+				-- Announce(string.format("[PSK] %d. %s (#%d in %s)", i, entry.name, listPos, PSK.CurrentList))
+			-- else
+				-- Announce(string.format("[PSK] %d. %s (Not listed in %s)", i, entry.name, listPos, PSK.CurrentList))
+
+			-- end
+		-- end
+		
 		for i, entry in ipairs(PSK.BidEntries) do
 			local listPos = indexMap[entry.name]
 			if listPos then
-				Announce(string.format("[PSK] %d. %s (Pos %d)", i, entry.name, listPos))
+				Announce(string.format("[PSK] %d. %s (%d in %s List)", i, entry.name, listPos, PSK.CurrentList))
 			else
-				Announce(string.format("[PSK] %d. %s (Not Listed)", i, entry.name))
+				Announce(string.format("[PSK] %d. %s (Not listed in %s List)", i, entry.name, PSK.CurrentList))
 			end
 		end
+
 
     end
 end
