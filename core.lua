@@ -264,10 +264,28 @@ function PSK:CloseBidding()
 		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
     else
 		SendChatMessage("[PSK] Bidding closed. Bidders:", "RAID_WARNING")
-        for _, entry in ipairs(PSK.BidEntries) do
-            local line = string.format("[PSK] %d. %s", entry.position, entry.name)
-            Announce(line)
-        end
+        local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+		local indexMap = {}
+		for i, name in ipairs(currentList) do
+			indexMap[name] = i
+		end
+
+		-- Sort bids by position in list, unknowns to bottom
+		table.sort(PSK.BidEntries, function(a, b)
+			local aIndex = indexMap[a.name] or math.huge
+			local bIndex = indexMap[b.name] or math.huge
+			return aIndex < bIndex
+		end)
+
+		for i, entry in ipairs(PSK.BidEntries) do
+			local listPos = indexMap[entry.name]
+			if listPos then
+				Announce(string.format("[PSK] %d. %s (Pos %d)", i, entry.name, listPos))
+			else
+				Announce(string.format("[PSK] %d. %s (Not Listed)", i, entry.name))
+			end
+		end
+
     end
 end
 

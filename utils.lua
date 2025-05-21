@@ -1069,12 +1069,21 @@ function PSK:RefreshBidList()
         child:SetParent(nil)
     end
 
-    -- Sort by position (assumes indexMap is defined elsewhere)
-    table.sort(PSK.BidEntries, function(a, b)
-        local indexA = indexMap[a] or math.huge
-        local indexB = indexMap[b] or math.huge
-        return indexA < indexB
-    end)
+    -- Build index map from current list
+	local indexMap = {}
+	local list = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+	if not list then list = {} end  -- fallback to empty table if nil
+
+	for i, name in ipairs(list) do
+		indexMap[name] = i
+	end
+
+	-- Sort bidders by list position; if not in list, push to end
+	table.sort(PSK.BidEntries, function(a, b)
+		local aIndex = indexMap[a.name] or math.huge
+		local bIndex = indexMap[b.name] or math.huge
+		return aIndex < bIndex
+	end)
 
     local yOffset = -5
     for index, bidData in ipairs(PSK.BidEntries) do
