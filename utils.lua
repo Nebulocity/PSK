@@ -1413,6 +1413,7 @@ function PSK:GetLootThresholdName()
 	return qualityNames[threshold] or ("Unknown (" .. threshold .. ")")
 end
 
+
 -------------------------------------------
 -- Update the Loot Threshold On Change
 -------------------------------------------
@@ -1435,83 +1436,6 @@ function PSK:UpdateLootThresholdLabel(newThreshold)
     PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
 end
 
-
---------------------------------------------
--- Add Import/Export Section to Settings Tab
---------------------------------------------
-
-function PSK:ExportLists()
-    -- Format the lists with one name per line, comma-separated
-    local function formatList(list)
-        local formatted = {}
-        for _, name in ipairs(list or {}) do
-            table.insert(formatted, name .. ",")
-        end
-        return table.concat(formatted, "\n")
-    end
-    
-    local mainList = formatList(PSKDB.MainList or {})
-    local tierList = formatList(PSKDB.TierList or {})
-    
-    return mainList, tierList
-end
-
-
--------------------------------------------
--- Import Lists from Separate Text Boxes
--------------------------------------------
-
-function PSK:ImportLists()
-    local mainText = PSK.MainListEditBox:GetText()
-    local tierText = PSK.TierListEditBox:GetText()
-
-    -- Clear current lists
-    PSKDB.MainList = {}
-    PSKDB.TierList = {}
-
-    -- Get all guild members
-    local guildMembers = {}
-    if IsInGuild() then
-        for i = 1, GetNumGuildMembers() do
-            local fullName = GetGuildRosterInfo(i)
-            if fullName then
-                local shortName = Ambiguate(fullName, "short")
-                guildMembers[shortName:lower()] = true
-            end
-        end
-    end
-
-    -- Import Main List
-    for name in mainText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-			table.insert(PSKDB.MainList, trimmedName)
-            -- if guildMembers[trimmedName:lower()] then
-                -- table.insert(PSKDB.MainList, trimmedName)
-            -- else
-                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Main List.|r")
-            -- end
-        end
-    end
-
-    -- Import Tier List
-    for name in tierText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-            
-			table.insert(PSKDB.TierList, trimmedName)
-			-- if guildMembers[trimmedName:lower()] then
-                -- table.insert(PSKDB.TierList, trimmedName)
-            -- else
-                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Tier List.|r")
-            -- end
-        end
-    end
-
-    -- Update the UI
-    PSK:DebouncedRefreshPlayerList()
-    print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
-end
 
 
 -------------------------------------------
@@ -1714,6 +1638,47 @@ function PSK:Log(msg, ...)
 		print("[PSK DEBUG]    ", string.format(msg, ...))
 	end
 end
+
+
+--------------------------------------------
+-- Logging function  (RUN ONCE ON STARTUP!)
+--------------------------------------------
+
+local function MigrateListFormat(list)
+	if not list then return {} end
+	
+	local migrated = {}
+	
+	for _, entry in ipairs(list) do
+		if type(entry) == "string" then 
+			table.insert(migrated, { name = entry, class = PSK:GetClassForPlayer(entry) or "UNKNOWN", dateLastRaided = nil })
+		elseif type(entry) == "table" then 
+			table.insert(migrated, entry)
+		end
+	end
+	
+	return migrated
+end
+
+
+--------------------------------------------
+-- Update last raid date
+--------------------------------------------
+
+function PSK:UpdateLastRaidDate(playerName)
+	local function update(list)
+		for _, entry in ipairs(list) do
+			if entry.name == playerName then
+				entry.dateLastRaided = date(%m-%d-%Y)
+				return
+			end
+		end
+	end
+	
+	update(PSKDB.MainList)
+	update(PSKDB.TierList)
+end
+
 
 -------------------------------------------
 -- Serialize Data
