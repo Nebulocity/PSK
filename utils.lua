@@ -37,6 +37,8 @@ CLASS_NAME_TO_FILE = {
     ["Druid"]   = "DRUID",
 }
 
+-- DO NOT OVERWRITE 'RAID_CLASS_COLORS'!!!
+-- It will break other addons...
 local CLASS_COLORS = RAID_CLASS_COLORS or {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
     PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
@@ -94,7 +96,7 @@ function PerformAward(index)
 	-- Use the selected item instead of relying on index
 	local item = PSK.SelectedItemData
 
-	-- Defensive fallback
+	-- In case an item wasn't selected for award, or it became deselected
 	if not item then
 		print("[PSK] Error: No selected item found for award")
 		return
@@ -130,26 +132,49 @@ function PerformAward(index)
         PSK:DebouncedRefreshLootList()
     end
 
-    -- Remove from bids
-    table.remove(PSK.BidEntries, index)
+	-- Reorder standings based on current list and selected player
+	PSK:ReorderListOnAward(PSK.CurrentList, PSK.SelectedPlayer)
 
-    -- Move awarded player to end of list
-    for i = #list, 1, -1 do
-        if list[i]:lower() == playerName:lower() then
-            table.remove(list, i)
-            break
-        end
-    end
+    -- -- Remove from bids
+    -- table.remove(PSK.BidEntries, index)
+
+    -- -- Remove the awarded player from the list
+    -- for i = #list, 1, -1 do
+        -- if list[i]:lower() == playerName:lower() then
+            -- table.remove(list, i)
+            -- break
+        -- end
+    -- end
 	
-    table.insert(list, playerName)
+	-- -- Insert the awarded player back at the bottom of the list
+    -- table.insert(list, playerName)
 
 	-- Get class color
 	local color = RAID_CLASS_COLORS[playerClass or "SHAMAN"] or { r = 1, g = 1, b = 1 }
 	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
 
+	-- Get item details
 	local itemLink = PSK.SelectedItem
 	local itemName = GetItemInfo(itemLink) or itemLink
-	Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+	
+	-- Auto-award loot.
+	-- Only works with loot window open and player nearby.
+
+	for i = 1, GetNumLootItems() do
+		local mlItemLink = GetLootSlotLink(i)
+		
+		if mlItemLink == itemLink then
+			for j = 1, GetNumGroupMembers() do
+				local candidateName = GetMasterLootCandidate(i, j)
+				
+				if candidateName == PSK.SelectedPlayer then
+					GiveMasterLoot(i, j)
+					Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+					return
+				end
+			end
+		end
+	end	
 
     -- Log the award
     table.insert(PSKDB.LootLogs, {
@@ -174,6 +199,106 @@ function PerformAward(index)
 end
 
 
+-----------------------------------------------------------
+-- Adjust standings when a player is awarded:
+-- 	Non-raid member standings are frozen
+-- 	Raid member standings move around them
+-- 	In the event of a tie, non-Raid goes 1 position lower
+-----------------------------------------------------------
+
+function PSK:ReorderListOnAward(listName, awardedPlayer)
+    local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
+    if not list then return end
+
+	PSK:Log("Reordering %s list after awarding to: %s", listName, awardedPlayer)
+	
+    -- Get a lookup of all raid members
+    local raidRoster = {}
+    for i = 1, GetNumGroupMembers() do
+        local name = GetRaidRosterInfo(i)
+        if name then
+            local baseName = Ambiguate(name, "short")
+            raidRoster[baseName] = true
+        end
+    end
+
+    -- Build categorized lists
+    local inRaid = {}
+    local notInRaid = {}
+
+    -- Preserve order while separating raid members and non-raid
+    for i = 1, #list do
+        local name = list[i]
+        if name == awardedPlayer then
+            -- Skip for now (we’ll reinsert them)
+			PSK:Log("Skipping awarded player: %s", name)
+        elseif raidRoster[name] then
+			-- If they're in the raid (raidRoster[name] = true
+            table.insert(inRaid, name)
+			PSK:Log("In-raid member kept: %s", name)
+        else
+			-- If they're not in the raid (raidRoster[name] = false
+            table.insert(notInRaid, name)
+			PSK:Log("Non-raid member preserved: %s", name)
+        end
+    end
+
+    -- Add awarded player to bottom of inRaid list
+    table.insert(inRaid, awardedPlayer)
+	PSK:Log("Awarded player added to bottom of raid list: %s", awardedPlayer)
+	
+	
+    -- Merge back: interweave non-raiders into their original positions
+    local newList = {}
+    local raidIndex, nonRaidIndex = 1, 1
+    for i = 1, #list do
+        local expectedName = list[i]
+        local isInRaid = raidRoster[expectedName]
+        local nextRaid = inRaid[raidIndex]
+        local nextNonRaid = notInRaid[nonRaidIndex]
+
+        if not isInRaid and nextNonRaid == expectedName then
+            table.insert(newList, nextNonRaid)
+			PSK:Log("Added non-raid: %s", nextNonRaid)
+            nonRaidIndex = nonRaidIndex + 1
+        elseif isInRaid and nextRaid then
+            table.insert(newList, nextRaid)
+			PSK:Log("Added raid member: %s", nextRaid)
+            raidIndex = raidIndex + 1
+        elseif nextNonRaid then
+            -- Tie breaker: non-raid loses
+            table.insert(newList, nextNonRaid)
+			PSK:Log("Added raid member: %s", nextRaid)
+            nonRaidIndex = nonRaidIndex + 1
+        end
+    end
+
+    -- Fallback in case of mismatch
+    while raidIndex <= #inRaid do
+        table.insert(newList, inRaid[raidIndex])
+		PSK:Log("Added remaining raid member: %s", inRaid[raidIndex])
+        raidIndex = raidIndex + 1
+    end
+	
+    while nonRaidIndex <= #notInRaid do
+        table.insert(newList, notInRaid[nonRaidIndex])
+		PSK:Log("Added remaining non-raid: %s", notInRaid[nonRaidIndex])
+        nonRaidIndex = nonRaidIndex + 1
+    end
+
+	PSK:Log("New %s list order:", listName)
+    for i, name in ipairs(newList) do
+        PSK:Log("  %d. %s", i, name)
+    end
+	
+    -- Save result
+    if listName == "Tier" then
+        PSKDB.TierList = newList
+    else
+        PSKDB.MainList = newList
+    end
+	
+end
 
 ---------------------------------
 -- Pass on current player
@@ -335,7 +460,7 @@ function PSK:RefreshLootList()
                 PSK.SelectedItem = row.itemLink
                 PSK.SelectedItemData = row.lootData
                 PSK.BidButton:Enable()
-                print("[PSK] Selected item for bidding: " .. row.itemLink)
+                PSK:Log("[PSK] Selected item for bidding: " .. row.itemLink)
 
                 local pulse = row:CreateAnimationGroup()
                 local fadeOut = pulse:CreateAnimation("Alpha")
@@ -836,7 +961,7 @@ PSK.EventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_REGEN_ENABLED" then
         PSK:DebouncedRefreshPlayerList()
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        print("[PSK] Player list updated after combat.")
+        PSK:Log("[PSK] Player list updated after combat.")
     end
 end)
 
@@ -869,7 +994,7 @@ function PSK:RefreshAvailablePlayerList()
     local tierChild = PSK.ScrollChildren.TierAvailable
 
     if not mainChild or not tierChild then
-        print("[PSK] Error: MainAvailable or TierAvailable scroll frames are not initialized.")
+        PSK:Log("[PSK] Error: MainAvailable or TierAvailable scroll frames are not initialized.")
         return
     end
 
@@ -1115,7 +1240,9 @@ function PSK:RefreshBidList()
             row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
         end
-        row.posText:SetText(bidData.position)
+		
+		row.posText:SetText(index)
+        -- row.posText:SetText(bidData.position)
 
         -- Class Icon
         local class = bidData.class or "SHAMAN"
@@ -1529,8 +1656,6 @@ function PSK:GetOrCreateRow(index, parent, rowType)
 end
 
 
-
-
 -------------------------------------------
 -- Refresh only after a short delay
 -------------------------------------------
@@ -1580,6 +1705,15 @@ function PSK:DebouncedRefreshLogList()
     end)
 end
 
+-------------------------------------------
+-- Logging function
+-------------------------------------------
+
+function PSK:Log(msg, ...)
+	if PSK.Settings and PSK.Settings.debugEnabled then
+		print("[PSK DEBUG]    ", string.format(msg, ...))
+	end
+end
 
 -------------------------------------------
 -- Serialize Data
