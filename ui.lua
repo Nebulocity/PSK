@@ -120,7 +120,7 @@ PSK.ImportExportFrame:Hide()
 -- Import/Export Frames
 ------------------------------
 
--- Path to your custom parchment texture
+-- Path to custom parchment texture
 local parchmentTexture = "Interface\\AddOns\\PSK\\Media\\parchment.png"
 
 
@@ -279,6 +279,7 @@ importButton:SetScript("OnClick", function()
     -- Show the confirmation dialog
     StaticPopup_Show("PSK_CONFIRM_IMPORT")
 end)
+
 
 ------------------------------
 -- Export Button
