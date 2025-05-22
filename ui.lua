@@ -645,6 +645,29 @@ soundCheckbox:SetScript("OnClick", function(self)
     print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
 end)
 
+
+--------------------------------
+-- Enable/Disable Debugging
+--------------------------------
+
+local debuggingCheckBox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
+debuggingCheckBox:SetPoint("TOPLEFT", 40, -80) 
+debuggingCheckBox.Text:SetText("Print Debug Text")
+debuggingCheckBox:SetChecked(PSK.Settings.debugEnabled)
+
+debuggingCheckBox:SetScript("OnClick", function(self)
+    local enabled = self:GetChecked()
+    PSK.Settings.buttonSoundsEnabled = enabled
+
+    -- Ensure PSKDB.Settings exists before we update it
+    if not PSKDB then PSKDB = {} end
+    if not PSKDB.Settings then PSKDB.Settings = {} end
+    PSKDB.Settings.debugEnabled = enabled
+
+    print("[PSK] Printing debug text " .. (enabled and "enabled." or "disabled."))
+end)
+
+
 ------------------------------
 -- Tab-Switching Logic
 ------------------------------
