@@ -100,7 +100,7 @@ lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 							PSK:DebouncedRefreshLogList()
 						end
 
-						print("[PSK] Master Looter viewed loot: " .. itemLink)
+						PSK:Log("[PSK] Master Looter viewed loot: " .. itemLink)
 					end
 				end)
 			end
@@ -246,7 +246,7 @@ function PSK:StartBidding()
     end
 
     -- Auto-close bidding after 15 seconds
-    C_Timer.After(15, function()
+    C_Timer.After(20, function()
         if BiddingOpen then
             PSK:CloseBidding()
         end
@@ -265,12 +265,16 @@ function PSK:CloseBidding()
 		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
     else
 		SendChatMessage("[PSK] Bidding closed. Bidders:", "RAID_WARNING")
-        local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+        
+		-- Determine the current list
+		local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+		
+		-- Get mapping of players and positions in the current list
 		local indexMap = {}
 		for i, name in ipairs(currentList) do
 			indexMap[name] = i
 		end
-
+		
 		-- Sort bids by position in list, unknowns to bottom
 		table.sort(PSK.BidEntries, function(a, b)
 			local aIndex = indexMap[a.name] or math.huge
@@ -278,16 +282,7 @@ function PSK:CloseBidding()
 			return aIndex < bIndex
 		end)
 
-		-- for i, entry in ipairs(PSK.BidEntries) do
-			-- local listPos = indexMap[entry.name]
-			-- if listPos then
-				-- Announce(string.format("[PSK] %d. %s (#%d in %s)", i, entry.name, listPos, PSK.CurrentList))
-			-- else
-				-- Announce(string.format("[PSK] %d. %s (Not listed in %s)", i, entry.name, listPos, PSK.CurrentList))
-
-			-- end
-		-- end
-		
+		-- Announce list of sorted bid entries
 		for i, entry in ipairs(PSK.BidEntries) do
 			local listPos = indexMap[entry.name]
 			if listPos then
@@ -297,7 +292,6 @@ function PSK:CloseBidding()
 			end
 		end
 
-
     end
 end
 
@@ -305,45 +299,15 @@ end
 -- Auto-Refresh Player Lists on Events
 ----------------------------------------
 
--- local eventFrame = CreateFrame("Frame")
--- eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
--- eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
--- eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
--- eventFrame:RegisterEvent("PLAYER_LOGIN")
--- eventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
--- eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
--- eventFrame:RegisterEvent("PARTY_MEMBER_ENABLE")
--- eventFrame:RegisterEvent("PARTY_MEMBER_DISABLE")
--- eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
--- eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-
 PSK.EventFrame = CreateFrame("Frame")
 PSK.EventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 PSK.EventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
 PSK.EventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
 PSK.EventFrame:RegisterEvent("LOOT_OPENED")
+PSK.EventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+PSK.EventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+PSK.EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
--- eventFrame:SetScript("OnEvent", function(self, event, ...)
-    -- -- Force a guild roster refresh
-    -- GuildRoster()
-
-    -- -- Update player data
-    -- PSK:UpdatePlayerData()
-
-    -- -- Refresh lists
-    -- if PSK and PSK.RefreshAvailableMembers then
-        -- PSK:DebouncedRefreshAvailablePlayerList()
-    -- end
-	
-    -- if PSK and PSK.RefreshPlayerList then
-        -- PSK:RefreshPlayerList()
-    -- end
-	
-	-- if event == "GROUP_ROSTER_UPDATE" then
-		-- PSK:RefreshGroupMemberData()
-	-- end
-
--- end)
 
 PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
 
@@ -359,7 +323,7 @@ PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
     end
 end)
 
-print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
+PSK:Log("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
 
 
 
@@ -508,7 +472,7 @@ slashFrame:SetScript("OnEvent", function()
 				PSK.MainFrame:Show()
 			end
 		else
-			print("PSK: MainFrame is not available yet.")
+			PSK:Log("PSK: MainFrame is not available yet.")
 		end
 	end
 
@@ -552,46 +516,12 @@ function PSK:PrintHelp()
     print("|cff00ff00[PSK Addon Help]|r")
     print("/psk                     - Toggle the PSK window")
     print("/psk help                - Show this help menu")
-    print("/psk list                - Show players in the current list")
     print("/pskadd <top|bottom> <main|tier> <name>    - Add player to a list")
     print("/pskremove <name>        - Remove player from current list")
     print("/pskremove all <name>    - Remove player from both lists")
     -- print("/pskexport               - Export current list as plain text")
 	-- print("/pskexport [all]         - Export current or both lists")
     print(" ")
-end
-
-------------------------------------------------
--- Print the currently selected list to console
-------------------------------------------------
-
-function PSK:PrintCurrentList()
-    local listType = PSK.CurrentList or "Main"
-    local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
-
-    print(" ")
-    print("|cff00ff00[PSK: " .. listType .. " List]|r")
-
-    if #list == 0 then
-        print("(Empty)")
-        return
-    end
-
-    for i, name in ipairs(list) do
-        local playerData = PSKDB.Players[name]
-        local class = playerData and playerData.class or "UNKNOWN"
-        class = string.upper(class)
-
-        local color = CLASS_COLORS[class] or { r = 0.8, g = 0.8, b = 0.8 }
-        local hex = string.format("|cff%02x%02x%02x", color.r * 255, color.g * 255, color.b * 255)
-
-        local status = ""
-        if playerData and playerData.online == false then
-            status = " |cff888888(offline)|r"
-        end
-
-        print(i .. ". " .. hex .. name .. "|r" .. status)
-    end
 end
 
 
