@@ -1,7 +1,7 @@
 ## Interface: 11505
 ## Title: PSK - Perchance Some Loot?
 ## Notes: Toot tracking and player roster manager for Perchance (Nightslayer-US)
-## Version: 1.0
+## Version: 1.1
 ## Author: Taurbucks
 ## SavedVariables: PSKGlobal, PSKDB, PSKBidList, PSKMinimapDB
 ## Dependencies
