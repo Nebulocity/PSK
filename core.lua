@@ -479,35 +479,6 @@ slashFrame:SetScript("OnEvent", function()
 end)
 
 ------------------------------------------
--- Console command to export lists
-------------------------------------------
-
--- SLASH_PSKEXPORT1 = "/pskexport"
--- SlashCmdList["PSKEXPORT"] = function(msg)
-    -- msg = msg and msg:lower():gsub("^%s+", "") or ""
-
-    -- if msg == "all" then
-        -- PSK:ExportList("Main")
-        -- PSK:ExportList("Tier")
-    -- else
-        -- PSK:ExportList(PSK.CurrentList or "Main")
-    -- end
--- end
-
-
--- function PSK:ExportList(listType)
-    -- local list = (listType == "Tier") and PSKDB.TierList or PSKDB.MainList
-
-    -- if #list == 0 then
-        -- print("[PSK] " .. listType .. " list is empty.")
-        -- return
-    -- end
-
-    -- local exportLine = table.concat(list, ", ")
-    -- PSK:ShowExportWindow(exportLine)
--- end
-
-------------------------------------------
 -- Console command to print command help
 ------------------------------------------
 
@@ -516,11 +487,9 @@ function PSK:PrintHelp()
     print("|cff00ff00[PSK Addon Help]|r")
     print("/psk                     - Toggle the PSK window")
     print("/psk help                - Show this help menu")
-    print("/pskadd <top|bottom> <main|tier> <name>    - Add player to a list")
+    print("/pskadd <top or bottom> <main or tier> <name>    - Add player to a list")
     print("/pskremove <name>        - Remove player from current list")
     print("/pskremove all <name>    - Remove player from both lists")
-    -- print("/pskexport               - Export current list as plain text")
-	-- print("/pskexport [all]         - Export current or both lists")
     print(" ")
 end
 
