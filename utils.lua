@@ -137,7 +137,7 @@ function PerformAward(index)
 
 	-- Reorder standings based on current list and selected player
 	if PSK.SelectedPlayer then
-		PSK:ReorderListOnAward(PSK.CurrentList, playerName)
+		PSK:ReorderListOnAward(PSK.CurrentList)
 	else
 		print("[PSK] Error: No selected player found to reorder list.")
 	end
@@ -194,17 +194,6 @@ function PerformAward(index)
 	local function removeItemFromList(list)
 		for i = #list, 1, -1 do
 			local entry = list[i]
-			
-			print(">> Comparing loot entry:")
-			print("   entry.itemLink    =", entry.itemLink)
-			print("   entry.timestamp   =", entry.timestamp)
-			print("   entry.itemTexture =", entry.itemTexture)
-
-			print(">> Against selected item:")
-			print("   itemLinkToRemove  =", itemLinkToRemove)
-			print("   timestampToRemove =", timestampToRemove)
-			print("   textureToRemove   =", textureToRemove)
-			print("-----")
 
 			if entry.itemLink == itemLinkToRemove and entry.timestamp == timestampToRemove then
 				print(">>> Match found — removing loot entry.")
@@ -235,100 +224,108 @@ end
 -- 	In the event of a tie, non-Raid goes 1 position lower
 -----------------------------------------------------------
 
+function PSK:ReorderListOnAward(listName)
+    local list = PSKDB[listName]
+    if not list or type(list) ~= "table" then return end
 
-function PSK:ReorderListOnAward(listName, awardedPlayer)
-    local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
-    if not list then return end
+    -- Remove the selected (awarded) player from the list
+    for i = #list, 1, -1 do
+	if PSK.SelectedPlayer == Ambiguate(name, "short")
+	    table.remove(list, i)
+	    print("Removed " .. PSK.SelectedPlayer .. " from " .. listName)
+	    return
+	end
+    end
 
-    print(string.format("Reordering %s list after awarding to: %s", listName or "Unknown", awardedPlayer or "nil"))
-
-    -- Get a lookup of all raid members
-    local raidRoster = {}
+    -- Re-insert the selected player at the bottom of the list
+    table.insert(list, PSK.SelectedPlayer)
+    print("Moved " .. PSK.SelectedPlayer .. " to the bottom of " .. listName)
+	
+    -- Build raid lookup
+    local raidLookup = {}
     for i = 1, GetNumGroupMembers() do
         local name = GetRaidRosterInfo(i)
         if name then
-            local baseName = Ambiguate(name, "short")
-            raidRoster[baseName] = true
+            raidLookup[Ambiguate(name, "short")] = true
         end
     end
 
-    -- Build categorized entries
-    local inRaid = {}
-    local notInRaid = {}
-    local awardedEntry = nil
+    -- Annotate entries
+    local workingList = {}
+    for index, name in ipairs(list) do
+        local shortName = Ambiguate(name, "short")
+        local isRaid = raidLookup[shortName] or false
+        local isOnline = PSK.IsGuildMemberOnline and PSK:IsGuildMemberOnline(shortName)
+        local status = isRaid and "In Raid" or (isOnline and "Online" or "Offline")
+        table.insert(workingList, {
+            name = name,
+            status = status,
+            isRaid = isRaid,
+            originalIndex = index
+        })
+    end
 
-    -- Separate players and skip the awarded one for now
-    for _, entry in ipairs(list) do
-        if entry.name == awardedPlayer then
-            awardedEntry = entry
-            print("Skipping awarded player: %s", entry.name)
-        elseif raidRoster[entry.name] then
-            table.insert(inRaid, entry)
-            print("In-raid member kept: %s", entry.name)
+    -- Debug: BEFORE
+    print("---- BEFORE SHIFT (" .. listName .. ") ----")
+    for i, entry in ipairs(workingList) do
+        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
+    end
+
+    -- Perform the shift
+    local i = 1
+    while i < #workingList do
+        local current = workingList[i]
+        local nextEntry = workingList[i + 1]
+
+        if not current.isRaid and nextEntry.isRaid then
+            -- Swap to move raid member up
+            workingList[i], workingList[i + 1] = nextEntry, current
+            if i > 1 then
+                i = i - 1
+            else
+                i = i + 1
+            end
         else
-            table.insert(notInRaid, entry)
-            print("Non-raid member preserved: " .. entry.name)
+            i = i + 1
         end
     end
 
-    -- Add awarded player to bottom of in-raid group
-    if awardedEntry then
-        table.insert(inRaid, awardedEntry)
-        print("Awarded player added to bottom of raid list: " .. awardedEntry.name)
-    end
-
-    -- Merge back: maintain not-in-raid players in original positions
-    local newList = {}
-    local raidIndex, nonRaidIndex = 1, 1
-
+    -- Apply sorted names back to list
     for i = 1, #list do
-        local expectedName = list[i].name
-        local isInRaid = raidRoster[expectedName]
-        local nextRaid = inRaid[raidIndex]
-        local nextNonRaid = notInRaid[nonRaidIndex]
+        list[i] = workingList[i].name
+    end
 
-        if not isInRaid and nextNonRaid and nextNonRaid.name == expectedName then
-            table.insert(newList, nextNonRaid)
-            print("Added non-raid: " .. nextNonRaid.name)
-            nonRaidIndex = nonRaidIndex + 1
-        elseif isInRaid and nextRaid then
-            table.insert(newList, nextRaid)
-            print("Added raid member: " .. nextRaid.name)
-            raidIndex = raidIndex + 1
-        elseif nextNonRaid then
-            -- Tie breaker: non-raid loses
-            table.insert(newList, nextNonRaid)
-            print("Added tie-break non-raid: " .. nextNonRaid.name)
-            nonRaidIndex = nonRaidIndex + 1
+    -- Debug: AFTER
+    print("---- AFTER SHIFT (" .. listName .. ") ----")
+    for i, entry in ipairs(workingList) do
+        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
+    end
+
+    -- Build and return a diff
+    local diff = {}
+    for i, entry in ipairs(workingList) do
+        if i ~= entry.originalIndex then
+            table.insert(diff, {
+                name = entry.name,
+                from = entry.originalIndex,
+                to = i,
+                status = entry.status
+            })
         end
     end
 
-    -- Catch stragglers
-    while raidIndex <= #inRaid do
-        table.insert(newList, inRaid[raidIndex])
-        print("Added remaining raid member: " .. inRaid[raidIndex].name)
-        raidIndex = raidIndex + 1
-    end
-
-    while nonRaidIndex <= #notInRaid do
-        table.insert(newList, notInRaid[nonRaidIndex])
-        print("Added remaining non-raid: " .. notInRaid[nonRaidIndex].name)
-        nonRaidIndex = nonRaidIndex + 1
-    end
-
-    print("New " .. listName .. " list order:")
-    for i, entry in ipairs(newList) do
-        print(string.format("  %d. %s", i, entry.name))
-    end
-
-    -- Save new order
-    if listName == "Tier" then
-        PSKDB.TierList = newList
+    -- Optional: print diff for debugging
+    if #diff > 0 then
+        print("---- MOVEMENT SUMMARY ----")
+        for _, entry in ipairs(diff) do
+            print(entry.name .. " (" .. entry.status .. ") moved from position " .. entry.from .. " to " .. entry.to)
+        end
     else
-        PSKDB.MainList = newList
+        print("---- NO MOVEMENT ----")
     end
-end
 
+    return diff
+end
 
 -- function PSK:ReorderListOnAward(listName, awardedPlayer)
     -- local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
@@ -1675,101 +1672,6 @@ end
 -- function PSK:GetName(entry)
     -- return type(entry) == "table" and entry.name or entry
 -- end
-
-
----------------------------------------------------
--- Sort a list after a player was awarded an item
----------------------------------------------------
-
-function PSK:ShiftNotInRaidPlayersDown(listName)
-    local list = PSKDB[listName]
-    if not list or type(list) ~= "table" then return end
-
-    -- Build raid lookup
-    local raidLookup = {}
-    for i = 1, GetNumGroupMembers() do
-        local name = GetRaidRosterInfo(i)
-        if name then
-            raidLookup[Ambiguate(name, "short")] = true
-        end
-    end
-
-    -- Annotate entries
-    local workingList = {}
-    for index, name in ipairs(list) do
-        local shortName = Ambiguate(name, "short")
-        local isRaid = raidLookup[shortName] or false
-        local isOnline = PSK.IsGuildMemberOnline and PSK:IsGuildMemberOnline(shortName)
-        local status = isRaid and "In Raid" or (isOnline and "Online" or "Offline")
-        table.insert(workingList, {
-            name = name,
-            status = status,
-            isRaid = isRaid,
-            originalIndex = index
-        })
-    end
-
-    -- Debug: BEFORE
-    print("---- BEFORE SHIFT (" .. listName .. ") ----")
-    for i, entry in ipairs(workingList) do
-        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
-    end
-
-    -- Perform the shift
-    local i = 1
-    while i < #workingList do
-        local current = workingList[i]
-        local nextEntry = workingList[i + 1]
-
-        if not current.isRaid and nextEntry.isRaid then
-            -- Swap to move raid member up
-            workingList[i], workingList[i + 1] = nextEntry, current
-            if i > 1 then
-                i = i - 1
-            else
-                i = i + 1
-            end
-        else
-            i = i + 1
-        end
-    end
-
-    -- Apply sorted names back to list
-    for i = 1, #list do
-        list[i] = workingList[i].name
-    end
-
-    -- Debug: AFTER
-    print("---- AFTER SHIFT (" .. listName .. ") ----")
-    for i, entry in ipairs(workingList) do
-        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
-    end
-
-    -- Build and return a diff
-    local diff = {}
-    for i, entry in ipairs(workingList) do
-        if i ~= entry.originalIndex then
-            table.insert(diff, {
-                name = entry.name,
-                from = entry.originalIndex,
-                to = i,
-                status = entry.status
-            })
-        end
-    end
-
-    -- Optional: print diff for debugging
-    if #diff > 0 then
-        print("---- MOVEMENT SUMMARY ----")
-        for _, entry in ipairs(diff) do
-            print(entry.name .. " (" .. entry.status .. ") moved from position " .. entry.from .. " to " .. entry.to)
-        end
-    else
-        print("---- NO MOVEMENT ----")
-    end
-
-    return diff
-end
 
 
 -------------------------------------------
