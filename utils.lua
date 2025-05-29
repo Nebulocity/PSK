@@ -1677,9 +1677,99 @@ end
 -- end
 
 
+---------------------------------------------------
+-- Sort a list after a player was awarded an item
+---------------------------------------------------
 
+function PSK:ShiftNotInRaidPlayersDown(listName)
+    local list = PSKDB[listName]
+    if not list or type(list) ~= "table" then return end
 
+    -- Build raid lookup
+    local raidLookup = {}
+    for i = 1, GetNumGroupMembers() do
+        local name = GetRaidRosterInfo(i)
+        if name then
+            raidLookup[Ambiguate(name, "short")] = true
+        end
+    end
 
+    -- Annotate entries
+    local workingList = {}
+    for index, name in ipairs(list) do
+        local shortName = Ambiguate(name, "short")
+        local isRaid = raidLookup[shortName] or false
+        local isOnline = PSK.IsGuildMemberOnline and PSK:IsGuildMemberOnline(shortName)
+        local status = isRaid and "In Raid" or (isOnline and "Online" or "Offline")
+        table.insert(workingList, {
+            name = name,
+            status = status,
+            isRaid = isRaid,
+            originalIndex = index
+        })
+    end
+
+    -- Debug: BEFORE
+    print("---- BEFORE SHIFT (" .. listName .. ") ----")
+    for i, entry in ipairs(workingList) do
+        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
+    end
+
+    -- Perform the shift
+    local i = 1
+    while i < #workingList do
+        local current = workingList[i]
+        local nextEntry = workingList[i + 1]
+
+        if not current.isRaid and nextEntry.isRaid then
+            -- Swap to move raid member up
+            workingList[i], workingList[i + 1] = nextEntry, current
+            if i > 1 then
+                i = i - 1
+            else
+                i = i + 1
+            end
+        else
+            i = i + 1
+        end
+    end
+
+    -- Apply sorted names back to list
+    for i = 1, #list do
+        list[i] = workingList[i].name
+    end
+
+    -- Debug: AFTER
+    print("---- AFTER SHIFT (" .. listName .. ") ----")
+    for i, entry in ipairs(workingList) do
+        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
+    end
+
+    -- Build and return a diff
+    local diff = {}
+    for i, entry in ipairs(workingList) do
+        if i ~= entry.originalIndex then
+            table.insert(diff, {
+                name = entry.name,
+                from = entry.originalIndex,
+                to = i,
+                status = entry.status
+            })
+        end
+    end
+
+    -- Optional: print diff for debugging
+    if #diff > 0 then
+        print("---- MOVEMENT SUMMARY ----")
+        for _, entry in ipairs(diff) do
+            print(entry.name .. " (" .. entry.status .. ") moved from position " .. entry.from .. " to " .. entry.to)
+        end
+    else
+        print("---- NO MOVEMENT ----")
+    end
+
+    return diff
+end
 
 
 -------------------------------------------
