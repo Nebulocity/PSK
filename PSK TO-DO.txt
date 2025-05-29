@@ -1,0 +1,7 @@
+
+- More than 1 bid = no names showing
+- Clear loot button not working
+- Default loot drops to Epic
+- Record all epic loot, all the time
+- Move list up/down buttons to top
+- Import/Export Per-list

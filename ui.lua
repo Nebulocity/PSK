@@ -6,9 +6,9 @@ local PSK = select(2, ...)
 ------------------------
 
 if not PSKDB then PSKDB = {} end
-PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 1 } -- change to 3 for rare
+PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 3 } -- default to 3 for rare
 PSK.Settings = CopyTable(PSKDB.Settings)
-local mainListCount = #PSKDB.MainList or 0
+-- local mainListCount = #PSKDB.MainList or 0
 local pskTabScrollFrameHeight = -115
 local manageTabScrollFrameHeight = -87
 
@@ -262,48 +262,6 @@ end)
 
 PSK.TierListEditBox = tierEditBox
 
-------------------------------
--- Import Button
-------------------------------
-
-local importButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
-importButton:SetSize(120, 30)
-importButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 20, 20)
-importButton:SetText("Import")
-
-importButton:SetScript("OnClick", function()
-    local mainText = PSK.MainListEditBox:GetText()
-    local tierText = PSK.TierListEditBox:GetText()
-   
-
-    -- Show the confirmation dialog
-    StaticPopup_Show("PSK_CONFIRM_IMPORT")
-end)
-
-
-------------------------------
--- Export Button
-------------------------------
-
-local exportButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
-exportButton:SetSize(120, 30)
-exportButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -20, 20)
-exportButton:SetText("Export")
-exportButton:SetScript("OnClick", function()
-    local mainList, tierList = PSK:ExportLists()
-    PSK.MainListEditBox:SetText(mainList)
-    PSK.TierListEditBox:SetText(tierList)
-    PSK.MainListEditBox:HighlightText()
-    PSK.TierListEditBox:HighlightText()
-    PSK.MainListEditBox:SetFocus()
-    print("[PSK] Lists Exported Successfully")
-end)
-
-
-
-
-
-
 
 
 ---------------------------------------------
@@ -318,7 +276,7 @@ PSK.CurrentList = "Main"
 ----------------------------------------------
 
 local playerScroll, playerChild, playerFrame, playerHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, pskTabScrollFrameHeight, "PSK Main (" .. mainListCount .. ")")
+    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, pskTabScrollFrameHeight, "PSK Main ( .. mainListCount .. )")
 PSK.ScrollFrames.Main = playerScroll
 PSK.ScrollChildren.Main = playerChild
 playerHeader:ClearAllPoints()
@@ -344,7 +302,7 @@ PSK.Headers.Loot = lootHeader
 
 local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
 local bidScroll, bidChild, bidFrame, bidHeader =
-    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, pskTabScrollFrameHeight, "Bids (" .. bidCount .. ")", 220)
+    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, pskTabScrollFrameHeight, "Bids ( .. bidCount .. )", 220)
 PSK.ScrollFrames.Bid = bidScroll
 PSK.ScrollChildren.Bid = bidChild
 bidHeader:ClearAllPoints()
@@ -357,11 +315,9 @@ PSK.Headers.Bid = bidHeader
 
 local mainHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 mainHeader:SetPoint("TOPLEFT", 10, -10)
--- mainHeader:SetText("Available for Main List")
 
 local tierHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 tierHeader:SetPoint("TOPLEFT", 365, -10)
--- tierHeader:SetText("Available for Tier List")
 
 -- Create the two scroll lists
 local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 2, manageTabScrollFrameHeight, "Available PSK Main Members")
@@ -429,6 +385,7 @@ textRight:SetTextColor(1, 0.85, 0.1)
 
 
 
+
 ------------------------------------------------
 -- Dialog for clearing loot drops
 ------------------------------------------------
@@ -438,47 +395,13 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
     button1 = "Yes",
     button2 = "Cancel",
 	OnAccept = function()
+		PSKDB.LootDrops = PSKDB.LootDrops or {}
 		wipe(PSKDB.LootDrops)
-		PSK.LootDrops = PSKDB.LootDrops
 		PSK:DebouncedRefreshLootList()
 	end
 
 }
 
-----------------------------------------------
--- Warning if loot not being recorded
-----------------------------------------------
-
-local lootRecordingWarning = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lootRecordingWarning:SetPoint("CENTER", lootHeader, "CENTER", 80, 20)
-lootRecordingWarning:SetText(">>> Loot is not being recorded! <<<")
-lootRecordingWarning:SetTextColor(1, 0, 0)
-lootRecordingWarning:Hide()
-
-----------------------------------------------
--- Pulse the loot warning
-----------------------------------------------
-local lootPulse = lootRecordingWarning:CreateAnimationGroup()
-
-local lootFadeOut = lootPulse:CreateAnimation("Alpha")
-lootFadeOut:SetFromAlpha(1)
-lootFadeOut:SetToAlpha(0.2)
-lootFadeOut:SetDuration(0.5)
-lootFadeOut:SetOrder(1)
-
-local lootFadeIn = lootPulse:CreateAnimation("Alpha")
-lootFadeIn:SetFromAlpha(0.2)
-lootFadeIn:SetToAlpha(1)
-lootFadeIn:SetDuration(0.5)
-lootFadeIn:SetOrder(2)
-
-lootPulse:SetLooping("REPEAT")
-lootRecordingWarning.pulse = lootPulse
-
-------------------------------------------------
--- To check whether loot is recording elsewhere
-------------------------------------------------
-PSK.RecordingWarningDrops = lootRecordingWarning
 
 ------------------------------
 -- Create Log scroll frame
@@ -490,70 +413,7 @@ PSK.ScrollFrames.Logs = logScroll
 PSK.ScrollChildren.Logs = logChild
 PSK.Headers.Logs = logHeader
 
-----------------------------------
--- Warning for not recording loot
-----------------------------------
 
-local recordingWarning = PSK.LogsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-recordingWarning:SetPoint("LEFT", logHeader, "RIGHT", 10, 0)
-recordingWarning:SetText("Loot is not being recorded!")
-recordingWarning:SetTextColor(1, 0, 0)
-recordingWarning:Hide()
-
-----------------------------------
--- Warning pulse animation
-----------------------------------
-
-local pulse = recordingWarning:CreateAnimationGroup()
-local fadeOut = pulse:CreateAnimation("Alpha")
-fadeOut:SetFromAlpha(1)
-fadeOut:SetToAlpha(0.2)
-fadeOut:SetDuration(0.5)
-fadeOut:SetOrder(1)
-
-local fadeIn = pulse:CreateAnimation("Alpha")
-fadeIn:SetFromAlpha(0.2)
-fadeIn:SetToAlpha(1)
-fadeIn:SetDuration(0.5)
-fadeIn:SetOrder(2)
-
-pulse:SetLooping("REPEAT")
-recordingWarning.pulse = pulse
-
-PSK.RecordingWarningLogs = recordingWarning
-
-------------------------------
--- Set loot thresholds
-------------------------------
-
-local threshold = PSK.Settings and PSK.Settings.lootThreshold or 3
- PSK.RarityNames = {
-    [0] = "Poor",
-    [1] = "Common",
-    [2] = "Uncommon",
-    [3] = "Rare",
-    [4] = "Epic",
-    [5] = "Legendary"
-}
-
- PSK.RarityColors = {
-    [0] = "9d9d9d", -- Poor
-    [1] = "ffffff", -- Common
-    [2] = "1eff00", -- Uncommon
-    [3] = "0070dd", -- Rare
-    [4] = "a335ee", -- Epic
-    [5] = "ff8000", -- Legendary
-}
-
-------------------------------
--- Set Loot Threshold Header
-------------------------------
-
-local rarityName = PSK.RarityNames[threshold] or "?"
-local upArrow = "|TInterface\\AddOns\\PSK\\media\\arrow_up.tga:24:24|t"
-local dropCount = #PSK.LootDrops
-lootHeader:SetText("Loot Drops")
--- lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
 
 ------------------------------
 -- Create Tabs for MainFrame
@@ -696,7 +556,7 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
         PSK.ContentFrame:Show()
     elseif tabID == 2 then
         PSK.ManageFrame:Show()
-        PSK:DebouncedRefreshAvailablePlayerList()
+        PSK:DebouncedRefreshAvailablePlayerLists()
     elseif tabID == 3 then
         PSK.SettingsFrame:Show()
     elseif tabID == 4 then
@@ -747,18 +607,17 @@ PSKImportExportFrame:Hide()
 
 
 
+
 ----------------------------------
 -- Refresh lists on load
 ----------------------------------
 
 C_Timer.After(0.1, function()
-    if PSK.RefreshLogList then
-        PSK:UpdateLootThresholdLabel()
-		-- PSK:CreateImportExportSection()
-		PSK:DebouncedRefreshLogList()
-		PSK:DebouncedRefreshLootList()
-		PSK:DebouncedRefreshPlayerList()
-		PSK:DebouncedRefreshBidList()
-    end
+	PSK:DebouncedRefreshAvailablePlayerLists()
+	PSK:DebouncedRefreshPlayerLists()
+	PSK:DebouncedRefreshLootList()
+	-- PSK:CreateImportExportSection()
+	PSK:DebouncedRefreshLogList()	
+	PSK:DebouncedRefreshBidList()
 end)
 

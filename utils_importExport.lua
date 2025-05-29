@@ -3,30 +3,8 @@
 ----------------------------------------------------------
 
 local PSK = select(2, ...)
-
---------------------------------------------------
--- Export a list in a readable format for players
---------------------------------------------------
-
-function PSK:ExportReadableList(listType)
-	local list = (listType == "Tier") and PSKDB.tierList or PSKDB.MainList
-	
-	if not list then return "" end
-	
-	local output = {}
-	
-	for i, entry in ipairs(list) do
-		local name = entry.name or "Unknown"
-		local class = entry.class or "UNKNOWN"
-		local date = entry.dateLastRaided or "Never"
-		
-		table.insert(output, string.format("%d, %s, %s, %s", i, name, class, date))
-		
-	end
-	
-	return table.concat(output, "\n")
-end
-
+local LibSerialize = LibStub("LibSerialize")
+local LibDeflate = LibStub("LibDeflate")
 
 --------------------------------------------
 -- Add Import/Export Section to Settings Tab
@@ -49,47 +27,148 @@ end
 -- end
 
 
--------------------------------------------
--- Import Lists from Separate Text Boxes
--------------------------------------------
 
-function PSK:ImportLists()
-    local mainText = PSK.MainListEditBox:GetText()
-    local tierText = PSK.TierListEditBox:GetText()
+--------------------------------------------
+-- Export readable lists (for Discord, etc)
+--------------------------------------------
 
-    -- Clear current lists
-    PSKDB.MainList = {}
-    PSKDB.TierList = {}
+-- function PSK:ExportReadableLists()
+	-- local function formatList(list)
+		-- local output = {}
+		-- for i, entry in ipairs(list or {}) do
+			-- local name, class, date
 
-    -- Get all guild members
-    local guildMembers = {}
-    if IsInGuild() then
-        for i = 1, GetNumGuildMembers() do
-            local fullName = GetGuildRosterInfo(i)
-            if fullName then
-                local shortName = Ambiguate(fullName, "short")
-                guildMembers[shortName:lower()] = true
-            end
-        end
-    end
+			-- if type(entry) == "table" then
+				-- name = entry.name or "Unknown"
+				-- class = entry.class
+				-- date = entry.dateLastRaided
+			-- else
+				-- name = tostring(entry)
+			-- end
 
-    -- Import Main List
-    for name in mainText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-			table.insert(PSKDB.MainList, trimmedName)
-        end
-    end
+			-- -- Try to get missing data from PSKDB.Players
+			-- if name and (not class or class == "UNKNOWN") then
+				-- local playerData = PSKDB.Players and PSKDB.Players[name]
+				-- if playerData then
+					-- class = playerData.class or "UNKNOWN"
+					-- date = date or playerData.dateLastRaided
+				-- end
+			-- end
 
-    -- Import Tier List
-    for name in tierText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-			table.insert(PSKDB.TierList, trimmedName)
-        end
-    end
+			-- -- Default fallbacks
+			-- class = class or "UNKNOWN"
+			-- date = date or "Never"
 
-    -- Update the UI
-    PSK:DebouncedRefreshPlayerList()
-    print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
-end
+			-- table.insert(output, string.format("%d, %s, %s, %s", i, name, class, date))
+		-- end
+		-- return table.concat(output, "\n")
+	-- end
+
+	-- local main = formatList(PSKDB.MainList)
+	-- local tier = formatList(PSKDB.TierList)
+	-- return main, tier
+-- end
+
+
+
+-------------------------------------
+-- Cleans a PSK list for serializing
+-------------------------------------
+
+-- local function cleanList(list)
+    -- local result = {}
+    -- for _, entry in ipairs(list or {}) do
+        -- local name = entry.name or entry
+        -- table.insert(result, {
+            -- name = name,
+            -- class = (entry.class or (PSKDB.Players and PSKDB.Players[name] and PSKDB.Players[name].class)) or "UNKNOWN",
+            -- dateLastRaided = entry.dateLastRaided or "Never"
+        -- })
+    -- end
+    -- return result
+-- end
+
+
+--------------------------------------------
+-- Validates and normalizes table structure
+--------------------------------------------
+
+-- local function sanitizeList(data)
+    -- local cleaned = {}
+    -- for _, entry in ipairs(data) do
+        -- -- Fix nested tables if needed
+        -- if type(entry.name) == "table" then
+            -- entry = entry.name
+        -- end
+
+        -- table.insert(cleaned, {
+            -- name = entry.name or "Unknown",
+            -- class = entry.class or "UNKNOWN",
+            -- dateLastRaided = entry.dateLastRaided or "Never"
+        -- })
+    -- end
+    -- return cleaned
+-- end
+
+
+
+
+---------------------------
+-- Export/Import PSK Tier List
+---------------------------
+
+
+-- function PSK:ExportPSKTierList()
+    -- local cleanedList = cleanList(PSKDB.TierList)
+
+    -- local serialized = LibSerialize:Serialize(cleanedList)
+    -- local compressed = LibDeflate:CompressDeflate(serialized)
+    -- local encoded = LibDeflate:EncodeForPrint(compressed)
+
+    -- return encoded
+-- end
+
+-- function PSK:ImportPSKTierList(encoded)
+    -- local compressed = LibDeflate:DecodeForPrint(encoded)
+    -- if not compressed then print("Invalid encoded string") return end
+
+    -- local serialized = LibDeflate:DecompressDeflate(compressed)
+    -- if not serialized then print("Failed to decompress") return end
+
+    -- local success, data = LibSerialize:Deserialize(serialized)
+    -- if not success then print("Failed to deserialize") return end
+
+    -- PSKDB.TierList = sanitizeList(data)
+    -- PSK:DebouncedRefreshPlayerLists()
+    -- print("[PSK] Tier list successfully imported.")
+-- end
+
+
+---------------------------
+-- Export/Import PSK Main List
+---------------------------
+
+-- function PSK:ExportPSKMainList()
+    -- local cleanedList = cleanList(PSKDB.MainList)
+
+    -- local serialized = LibSerialize:Serialize(cleanedList)
+    -- local compressed = LibDeflate:CompressDeflate(serialized)
+    -- local encoded = LibDeflate:EncodeForPrint(compressed)
+
+    -- return encoded
+-- end
+
+-- function PSK:ImportPSKMainList(encoded)
+    -- local compressed = LibDeflate:DecodeForPrint(encoded)
+    -- if not compressed then print("Invalid encoded string") return end
+
+    -- local serialized = LibDeflate:DecompressDeflate(compressed)
+    -- if not serialized then print("Failed to decompress") return end
+
+    -- local success, data = LibSerialize:Deserialize(serialized)
+    -- if not success then print("Failed to deserialize") return end
+
+    -- PSKDB.MainList = sanitizeList(data)
+    -- PSK:DebouncedRefreshPlayerLists()
+    -- print("[PSK] Main list successfully imported.")
+-- end

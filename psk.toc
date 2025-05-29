@@ -7,10 +7,12 @@
 ## Dependencies
 ## OptionalDeps: Blizzard_UIParent, Blizzard_CompactRaidFrames, Blizzard_RaidUI
 
+# External Libraries
+Libs\LibStub\LibStub.lua
+Libs\LibSerialize\LibSerialize.lua
+Libs\LibDeflate\LibDeflate.lua
 
 media\icon.tga
-
-import.lua
 
 core.lua
 

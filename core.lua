@@ -8,50 +8,72 @@ if not PSKDB then PSKDB = {} end
 if not PSKDB.Settings then PSKDB.Settings = {} end
 if not PSKDB.MainList then PSKDB.MainList = {} end
 if not PSKDB.TierList then PSKDB.TierList = {} end
-if not PSKDB.Players then PSKDB.Players = {} end
+if not PSKDB.LootDrops then PSKDB.LootDrops = {} end
 if not PSKDB.LootLogs then PSKDB.LootLogs = {} end
 
 _G.PSKGlobal = _G.PSKGlobal or {}
-PSKGlobal.LootDrops = PSKGlobal.LootDrops or {}
-PSK.LootDrops = PSKGlobal.LootDrops
+
 
 -- Copy settings to table
 PSK.Settings = CopyTable(PSKDB.Settings)
 
 -- Set default loot threshold if not present
 if not PSKDB.Settings.lootThreshold then
-    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or GetLootThreshold() or 3
+    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or 3
 	PSKDB.Settings.lootThreshold = PSK.Settings.lootThreshold
 end
+
+PSK.RarityNames = {
+	[0] = "Poor",
+	[1] = "Common",
+	[2] = "Uncommon",
+	[3] = "Rare",
+	[4] = "Epic",
+	[5] = "Legendary"
+}
+
+ PSK.RarityColors = {
+	[0] = "9d9d9d", -- Poor
+	[1] = "ffffff", -- Common
+	[2] = "1eff00", -- Uncommon
+	[3] = "0070dd", -- Rare
+	[4] = "a335ee", -- Epic
+	[5] = "ff8000", -- Legendary
+}
+
 
 -- Main Variables
 BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
 
+-- Holds timer references, so they can be started/stopped manually.
+PSK.BidTimers = {}
+
+
 ----------------------------------------
 -- Zug zug
 ----------------------------------------
 
-function PSK:PlayRandomPeonSound()
-    if not PSK.Settings or not PSK.Settings.buttonSoundsEnabled then
-        return false
-    end
+-- function PSK:PlayRandomPeonSound()
+    -- if not PSK.Settings or not PSK.Settings.buttonSoundsEnabled then
+        -- return false
+    -- end
 
-    local normalSounds = {
-        "Sound\\Creature\\Peon\\PeonYes1.ogg",
-        "Sound\\Creature\\Peon\\PeonYes2.ogg",
-    }
-    local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg"
+    -- local normalSounds = {
+        -- "Sound\\Creature\\Peon\\PeonYes1.ogg",
+        -- "Sound\\Creature\\Peon\\PeonYes2.ogg",
+    -- }
+    -- local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg"
 
-    if math.random(1, 100) <= 5 then
-        PlaySoundFile(rareSound)
-        return true
-    else
-        PlaySoundFile(normalSounds[math.random(1, #normalSounds)])
-        return false
-    end
-end
+    -- if math.random(1, 100) <= 5 then
+        -- PlaySoundFile(rareSound)
+        -- return true
+    -- else
+        -- PlaySoundFile(normalSounds[math.random(1, #normalSounds)])
+        -- return false
+    -- end
+-- end
 
 
 
@@ -67,104 +89,56 @@ local lootViewFrame = CreateFrame("Frame")
 lootViewFrame:RegisterEvent("LOOT_OPENED")
 
 lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
-    if not PSK.LootRecordingActive then return end
-	
-    --if not IsMasterLooter() then return end  -- Only record if you're the ML
 
-	local numItems = GetNumLootItems()
-	local lootLinks = {}
+    if not IsMasterLooter() then return end
+    if not PSK.Settings or not PSK.Settings.lootThreshold then return end
 
-	for i = 1, numItems do
+    local numItems = GetNumLootItems()
+    local lootLinks = {}
+
+    for i = 1, numItems do 	
+        
 		if LootSlotHasItem(i) then
+            
 			local itemLink = GetLootSlotLink(i)
+            
 			if itemLink then
-				table.insert(lootLinks, itemLink)
+			
+                local rarity = select(3, GetItemInfo(itemLink))
+				
+                if rarity and rarity >= PSK.Settings.lootThreshold then
+				
+					if not PSK:IsLootAlreadyRecorded(itemLink) then
+						local itemLink = GetLootSlotLink(i)
+						local texture = GetLootSlotInfo(i) 
 
-				C_Timer.After(0.1, function()
-					local name, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
-					local threshold = PSK.Settings.lootThreshold or 3
-					if rarity and rarity >= threshold then
-						local playerName = UnitName("player")
-						local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
-
-						table.insert(PSKGlobal.LootDrops, {
-							itemLink = itemLink,
-							itemTexture = icon,
-							player = playerName,
-							class = class,
-							timestamp = date("%I:%M %p %m/%d/%Y")
-						})
-
-						PSK:DebouncedRefreshLootList()
-						if PSK.RefreshLogList then
-							PSK:DebouncedRefreshLogList()
+						if itemLink and texture then
+							local _, _, _, _, iconTexture = GetItemInfoInstant(itemLink)
+							
+							table.insert(lootLinks, itemLink)  -- just for announcing
+							
+							table.insert(PSKDB.LootDrops, { -- For loot tracking
+								itemLink = itemLink,
+								itemTexture = iconTexture or "Interface\\Icons\\INV_Misc_QuestionMark",
+								timestamp = date("%Y-%m-%d %H:%M:%S"),
+							})
 						end
-
-						PSK:Log("[PSK] Master Looter viewed loot: " .. itemLink)
 					end
-				end)
-			end
-		end
-	end
+                end
+            end
+        end
+    end
 
-	-- Announce loot bag contents
+    -- Announce loot contents
 	if #lootLinks > 0 then
 		local message = "[PSK] Loot Bag: " .. table.concat(lootLinks, ", ")
-		Announce(message)
+		PSK:Announce(message)
+		PSK:DebouncedRefreshLootList()
+		local lootLinks = {}
 	end
+	
 
 end)
-
-
--- local lootFrame = CreateFrame("Frame") 
--- lootFrame:RegisterEvent("CHAT_MSG_LOOT")
-
--- lootFrame:SetScript("OnEvent", function(self, event, msg)
-    -- if not PSK.LootRecordingActive then return end
-
-    -- Check if the loot message is for the player
-    -- local playerName = UnitName("player")
-    -- local youLooted = msg:match("You receive loot: (.+)")
-    -- local playerLooted, itemLink = msg:match("^([^%s]+) receives loot: (.+)")
-
-    -- Ignore messages that are not the current player
-    -- if playerLooted and playerLooted ~= playerName then
-        -- return
-    -- end
-
-    -- Use the correct item link based on the message
-    -- itemLink = itemLink or youLooted
-
-    -- Process the item if it's valid
-    -- if itemLink then
-        -- C_Timer.After(0.2, function()
-            -- local itemName, _, rarity, _, _, _, _, _, _, icon = GetItemInfo(itemLink)
-            -- local threshold = PSK.Settings.lootThreshold or 3
-
-            -- Only record items that meet the threshold
-            -- if rarity and rarity >= threshold then
-                -- local class = PSKDB.Players[playerName] and PSKDB.Players[playerName].class or "SHAMAN"
-
-                -- table.insert(PSKGlobal.LootDrops, {
-                    -- itemLink = itemLink,
-                    -- itemTexture = icon,
-                    -- player = playerName,
-                    -- class = class,
-                    -- timestamp = date("%I:%M %p %m/%d/%Y")
-                -- })
-
-                -- PSK:DebouncedRefreshLootList()
-
-                -- if PSK.RefreshLogList then
-                    -- PSK:RefreshLogList()
-                -- end
-
-                -- print("[PSK] Loot recorded: " .. itemLink .. " (" .. playerName .. ")")
-            -- end
-        -- end)
-    -- end
--- end)
-
 
 
 
@@ -172,27 +146,26 @@ end)
 -- Listen for loot method changes, which includes threshold changes
 --------------------------------------------------------------------
 
-local thresholdFrame = CreateFrame("Frame")
-thresholdFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
--- thresholdFrame:RegisterEvent("LOOT_THRESHOLD_CHANGED")
-thresholdFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == "PARTY_LOOT_METHOD_CHANGED" then
-        local newThreshold = GetLootThreshold() or 3
+-- local thresholdFrame = CreateFrame("Frame")
+-- thresholdFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
+-- thresholdFrame:SetScript("OnEvent", function(self, event, ...)
+    -- if event == "PARTY_LOOT_METHOD_CHANGED" then
+        -- local newThreshold = GetLootThreshold() or 3
 
-        -- Update PSK settings
-        PSK.Settings.lootThreshold = newThreshold
-        PSKDB.Settings.lootThreshold = newThreshold
+        -- -- Update PSK settings
+        -- PSK.Settings.lootThreshold = newThreshold
+        -- PSKDB.Settings.lootThreshold = newThreshold
 
-        -- Update the UI label
-        if PSK.UpdateLootThresholdLabel then
-            PSK:UpdateLootThresholdLabel()
-        end
-    end
-end)
+        -- -- Update the UI label
+        -- if PSK.UpdateLootThresholdLabel then
+            -- PSK:UpdateLootThresholdLabel()
+        -- end
+    -- end
+-- end)
 
 
 ----------------------------------------
--- Bidding System 
+-- Start Bidding
 ----------------------------------------
 
 function PSK:StartBidding()
@@ -210,6 +183,10 @@ function PSK:StartBidding()
 	end
 
     BiddingOpen = true
+	
+	-- Clear old timers just in case
+	PSK.BidTimers = {}
+
     PSK.BidEntries = {}
 	
 	if PSK.BidButton then
@@ -231,35 +208,53 @@ function PSK:StartBidding()
     -- Use the full item link for clickable text
 	
 	SendChatMessage("[PSK] [" .. listName .. "] Bidding has started for " .. itemLink .. "! 20 seconds remaining.", "RAID_WARNING")
-	Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
-	Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
-	Announce("[PSK] -----------------------------------------------------------------")
+	PSK:Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
+	PSK:Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
+	PSK:Announce("[PSK] -----------------------------------------------------------------")
 
     -- Countdown Messages
     local countdownTimes = {20, 15, 10, 5, 4, 3, 2, 1}
-    for _, seconds in ipairs(countdownTimes) do
-        C_Timer.After(20 - seconds, function()
-            if BiddingOpen then
-                Announce("[PSK] " .. seconds .. " seconds left to bid on " .. itemLink .. "!")
-            end
-        end)
-    end
+	for _, seconds in ipairs(countdownTimes) do
+		local timer = C_Timer.NewTimer(20 - seconds, function()
+			if BiddingOpen then
+				PSK:Announce("[PSK] " .. seconds .. " seconds left to bid on " .. itemLink .. "!")
+			end
+		end)
+		table.insert(PSK.BidTimers, timer)
+	end
 
-    -- Auto-close bidding after 15 seconds
-    C_Timer.After(20, function()
-        if BiddingOpen then
-            PSK:CloseBidding()
-        end
-    end)
+    -- Auto-close timer
+	local closeTimer = C_Timer.NewTimer(20, function()
+		if BiddingOpen then
+			PSK:CloseBidding()
+		end
+	end)
+	table.insert(PSK.BidTimers, closeTimer)
 
     PSK:DebouncedRefreshBidList()
 end
 
 
+----------------------------------------
+-- Close Bidding
+----------------------------------------
+
 function PSK:CloseBidding()
     BiddingOpen = false
     PSK.BidButton:SetText("Start Bidding")
-    PSK:DebouncedRefreshBidList()
+	
+	-- Cancel any active timers
+    if PSK.BidTimers then
+        for _, timer in ipairs(PSK.BidTimers) do
+            if timer.Cancel then
+                timer:Cancel()
+            end
+        end
+    end
+	
+    PSK.BidTimers = {}
+	
+    PSK:RefreshBidList()
 
     if #PSK.BidEntries == 0 then
 		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
@@ -271,9 +266,11 @@ function PSK:CloseBidding()
 		
 		-- Get mapping of players and positions in the current list
 		local indexMap = {}
-		for i, name in ipairs(currentList) do
-			indexMap[name] = i
+		
+		for i, entry in ipairs(currentList) do
+			indexMap[entry.name] = i
 		end
+
 		
 		-- Sort bids by position in list, unknowns to bottom
 		table.sort(PSK.BidEntries, function(a, b)
@@ -282,13 +279,13 @@ function PSK:CloseBidding()
 			return aIndex < bIndex
 		end)
 
-		-- Announce list of sorted bid entries
+		-- PSK:Announce list of sorted bid entries
 		for i, entry in ipairs(PSK.BidEntries) do
 			local listPos = indexMap[entry.name]
 			if listPos then
-				Announce(string.format("[PSK] %d. %s (%d in %s List)", i, entry.name, listPos, PSK.CurrentList))
+				PSK:Announce(string.format("[PSK] %d. %s (%d in %s List)", i, entry.name, listPos, PSK.CurrentList))
 			else
-				Announce(string.format("[PSK] %d. %s (Not listed in %s List)", i, entry.name, PSK.CurrentList))
+				PSK:Announce(string.format("[PSK] %d. %s (Not listed in %s List)", i, entry.name, PSK.CurrentList))
 			end
 		end
 
@@ -312,18 +309,18 @@ PSK.EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
 
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_FLAGS_CHANGED" then
-        PSK:DebouncedRefreshPlayerList()
-        PSK:DebouncedRefreshBidList()
+        PSK:DebouncedRefreshPlayerLists()
+        -- PSK:DebouncedRefreshBidList()
     elseif event == "GUILD_ROSTER_UPDATE" then
-		PSK:DebouncedRefreshAvailablePlayerList()
-        PSK:DebouncedRefreshPlayerList()
+		-- PSK:DebouncedRefreshAvailablePlayerLists()
+        -- PSK:DebouncedRefreshPlayerLists()
     elseif event == "LOOT_OPENED" then
         PSK:DebouncedRefreshLootList()
         PSK:DebouncedRefreshLogList()
     end
 end)
 
-PSK:Log("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
+-- print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
 
 
 
@@ -376,48 +373,161 @@ function AddBid(name)
 
     -- Prevent duplicate bids
     for _, entry in ipairs(PSK.BidEntries) do
-        if entry.name == name then
-            return -- Already bid
-        end
+        if entry.name == name then return end
     end
 
-    -- Attempt to find the player in the main or tier lists
-    local playerData = PSKDB.Players and PSKDB.Players[name]
-    local playerInList = false
+    -- Fallback class if not detected
+    local class = "SHAMAN"
+    local unit = nil
 
-    local function isPlayerInList(list)
-        for index, playerName in ipairs(list) do
-            if playerName == name then
-                playerInList = true
-                return index
+    -- Try to find unit for class info
+    if IsInRaid() then
+        for i = 1, MAX_RAID_MEMBERS do
+            local u = "raid" .. i
+            if UnitExists(u) and Ambiguate(UnitName(u), "short") == name then
+                unit = u
+                break
             end
         end
-        return nil
+    elseif IsInGroup() then
+        for i = 1, GetNumGroupMembers() - 1 do
+            local u = "party" .. i
+            if UnitExists(u) and Ambiguate(UnitName(u), "short") == name then
+                unit = u
+                break
+            end
+        end
     end
 
-    local position = isPlayerInList(PSKDB.MainList) or isPlayerInList(PSKDB.TierList) or (#PSK.BidEntries + 1)
+    if unit then
+        local _, classToken = UnitClass(unit)
+        class = classToken or class
+    end
 
-    -- Add to BidEntries with a note if they aren't in the main or tier list
+    -- Determine list to use
+    local list = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+    local found = false
+
+    for _, player in ipairs(list) do
+        if player.name == name then
+            found = true
+            break
+        end
+    end
+
+    -- Add to list if not found
+    if not found then
+        table.insert(list, {
+            name = name,
+            class = class,
+            dateLastRaided = "Never"
+        })
+        print("[PSK] " .. name .. " was added to the bottom of the " .. PSK.CurrentList .. " list.")
+    end
+
+    -- Get position in list
+    local position = nil
+    for i, player in ipairs(list) do
+        if player.name == name then
+            position = i
+            break
+        end
+    end
+
+    -- Add bid
     table.insert(PSK.BidEntries, {
-        position = position,
+        position = position or (#PSK.BidEntries + 1),
         name = name,
-        class = playerData and playerData.class or "UNKNOWN",
-        online = playerData and playerData.online or false,
-        inRaid = playerData and playerData.inRaid or false,
-        notListed = not playerInList,
+        class = class,
+        online = true,
+        inRaid = UnitInRaid(unit) ~= nil,
+        notListed = false,
     })
 
-    PSK:DebouncedRefreshBidList()
-
-    -- Print a warning if the player isn't in the lists
-    if not playerInList then
-        print("[PSK] Warning: " .. name .. " is not in the Main or Tier lists.")
-    end
+    PSK:RefreshBidList()
 end
 
 
+-- function AddBid(name)
+    -- if not name then return end
+
+    -- -- Prevent duplicate bids
+    -- for _, entry in ipairs(PSK.BidEntries) do
+        -- if entry.name == name then return end
+    -- end
+
+
+    -- -- Attempt to build missing player data if not present
+    -- if not PSKDB.Players[name] then
+        -- local class = "SHAMAN"
+        -- local unit = nil
+
+        -- if IsInRaid() then
+            -- for i = 1, MAX_RAID_MEMBERS do
+                -- local u = "raid" .. i
+                -- if UnitExists(u) and Ambiguate(UnitName(u), "short") == name then
+                    -- unit = u
+                    -- break
+                -- end
+            -- end
+        -- elseif IsInGroup() then
+            -- for i = 1, GetNumGroupMembers() - 1 do
+                -- local u = "party" .. i
+                -- if UnitExists(u) and Ambiguate(UnitName(u), "short") == name then
+                    -- unit = u
+                    -- break
+                -- end
+            -- end
+        -- end
+
+        -- if unit then
+            -- local _, classToken = UnitClass(unit)
+            -- class = classToken or class
+        -- end
+
+        -- PSKDB.Players[name] = {
+            -- class = class,
+            -- online = true,
+            -- inRaid = UnitInRaid(unit) ~= nil,
+            -- level = UnitLevel(unit) or "???",
+            -- zone = GetZoneText(),
+        -- }
+    -- end
+
+    -- local playerData = PSKDB.Players[name]
+    -- local playerInList = false
+
+    -- local function isPlayerInList(list)
+        -- for index, playerName in ipairs(list) do
+            -- if playerName == name then
+                -- playerInList = true
+                -- return index
+            -- end
+        -- end
+        -- return nil
+    -- end
+
+    -- local position = isPlayerInList(PSKDB.MainList) or isPlayerInList(PSKDB.TierList) or (#PSK.BidEntries + 1)
+
+    -- table.insert(PSK.BidEntries, {
+        -- position = position,
+        -- name = name,
+        -- class = playerData.class or "UNKNOWN",
+        -- online = playerData.online or false,
+        -- inRaid = playerData.inRaid or false,
+        -- notListed = not playerInList,
+    -- })
+
+    -- PSK:DebouncedRefreshBidList()
+
+    -- if not playerInList then
+        -- print("[PSK] Warning: " .. name .. " is not in the Main or Tier lists.")
+    -- end
+-- end
+
+
 ------------------------------------------
--- Scan these channels for the word "retract"
+-- Retract a bid
 ------------------------------------------
 
 function RetractBid(name)
@@ -426,7 +536,7 @@ function RetractBid(name)
     for i, entry in ipairs(PSK.BidEntries) do
         if entry.name == name then
             table.remove(PSK.BidEntries, i)
-            PSK:DebouncedRefreshBidList()
+            PSK:RefreshBidList()
             return
         end
     end
@@ -440,7 +550,7 @@ end
 function PSK:ClearSelection()
     PSK.SelectedPlayer = nil
     PSK.SelectedPlayerRow = nil
-    PSK:DebouncedRefreshPlayerList()
+    PSK:DebouncedRefreshPlayerLists()
 end
 
 
@@ -448,35 +558,33 @@ end
 -- Console commands to open addon
 ------------------------------------------
 
-local slashFrame = CreateFrame("Frame")
-slashFrame:RegisterEvent("PLAYER_LOGIN")
+-- local slashFrame = CreateFrame("Frame")
+-- slashFrame:RegisterEvent("PLAYER_LOGIN")
 
-slashFrame:SetScript("OnEvent", function()
-    SLASH_PSK1 = "/psk"
-    SlashCmdList["PSK"] = function(msg)
-		msg = msg and msg:lower():gsub("^%s+", "") or ""
+-- slashFrame:SetScript("OnEvent", function()
+    -- SLASH_PSK1 = "/psk"
+    -- SlashCmdList["PSK"] = function(msg)
+		-- msg = msg and msg:lower():gsub("^%s+", "") or ""
 
-		if msg == "help" then
-			PSK:PrintHelp()
-			return
-		elseif msg == "list" then
-			PSK:PrintCurrentList()
-			return
-		end
+		-- if msg == "help" then
+			-- PSK:PrintHelp()
+			-- return
+		-- elseif msg == "list" then
+			-- PSK:PrintCurrentList()
+			-- return
+		-- end
 
 
-		if PSK and PSK.MainFrame then
-			if PSK.MainFrame:IsShown() then
-				PSK.MainFrame:Hide()
-			else
-				PSK.MainFrame:Show()
-			end
-		else
-			PSK:Log("PSK: MainFrame is not available yet.")
-		end
-	end
+		-- if PSK and PSK.MainFrame then
+			-- if PSK.MainFrame:IsShown() then
+				-- PSK.MainFrame:Hide()
+			-- else
+				-- PSK.MainFrame:Show()
+			-- end
+		-- end
+	-- end
 
-end)
+-- end)
 
 ------------------------------------------
 -- Console command to print command help
@@ -529,189 +637,189 @@ end
 -- Console command to remove a player from main/tier/both lists
 -----------------------------------------------------------------
 
-SLASH_PSKREMOVE1 = "/pskremove"
-SlashCmdList["PSKREMOVE"] = function(msg)
-    local scope, name
+-- SLASH_PSKREMOVE1 = "/pskremove"
+-- SlashCmdList["PSKREMOVE"] = function(msg)
+    -- local scope, name
 
-    if msg:find("all%s+") then
-        scope, name = msg:match("^(all)%s+(%S+)")
-    else
-        name = msg:match("^(%S+)")
-        scope = "current"
-    end
+    -- if msg:find("all%s+") then
+        -- scope, name = msg:match("^(all)%s+(%S+)")
+    -- else
+        -- name = msg:match("^(%S+)")
+        -- scope = "current"
+    -- end
 
-    if not name then
-        print("Usage: /pskremove <playerName> or /pskremove all <playerName>")
-        return
-    end
+    -- if not name then
+        -- print("Usage: /pskremove <playerName> or /pskremove all <playerName>")
+        -- return
+    -- end
 
-    PSK:RemovePlayerByScope(scope, name)
-end
+    -- PSK:RemovePlayerByScope(scope, name)
+-- end
 
-function PSK:RemovePlayerByScope(scope, rawName)
-    local nameLower = Ambiguate(rawName, "short"):gsub("%s+", ""):lower()
-    local nameProper = rawName:sub(1, 1):upper() .. rawName:sub(2):lower()
-    local removed = false
+-- function PSK:RemovePlayerByScope(scope, rawName)
+    -- local nameLower = Ambiguate(rawName, "short"):gsub("%s+", ""):lower()
+    -- local nameProper = rawName:sub(1, 1):upper() .. rawName:sub(2):lower()
+    -- local removed = false
 
-    local function tryRemove(list, listName)
-        for i = #list, 1, -1 do
-            if Ambiguate(list[i], "short"):lower() == nameLower then
-                table.remove(list, i)
-                print("[PSK] Removed " .. nameProper .. " from the " .. listName .. " list.")
-                return true
-            end
-        end
-        return false
-    end
+    -- local function tryRemove(list, listName)
+        -- for i = #list, 1, -1 do
+            -- if Ambiguate(list[i], "short"):lower() == nameLower then
+                -- table.remove(list, i)
+                -- print("[PSK] Removed " .. nameProper .. " from the " .. listName .. " list.")
+                -- return true
+            -- end
+        -- end
+        -- return false
+    -- end
 
-    if scope == "all" then
-        removed = tryRemove(PSKDB.MainList, "Main") or removed
-        removed = tryRemove(PSKDB.TierList, "Tier") or removed
-    else
-        local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
-        local currentName = (PSK.CurrentList == "Tier") and "Tier" or "Main"
-        removed = tryRemove(currentList, currentName)
-    end
+    -- if scope == "all" then
+        -- removed = tryRemove(PSKDB.MainList, "Main") or removed
+        -- removed = tryRemove(PSKDB.TierList, "Tier") or removed
+    -- else
+        -- local currentList = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+        -- local currentName = (PSK.CurrentList == "Tier") and "Tier" or "Main"
+        -- removed = tryRemove(currentList, currentName)
+    -- end
 
-    if not removed then
-        print("[PSK] Could not find " .. nameProper .. " in the specified list(s).")
-    end
+    -- if not removed then
+        -- print("[PSK] Could not find " .. nameProper .. " in the specified list(s).")
+    -- end
 
-    PSK:DebouncedRefreshPlayerList()
-end
+    -- PSK:DebouncedRefreshPlayerLists()
+-- end
 
 ------------------------------------------------
 -- Capitalize names that get added to the lists
 ------------------------------------------------
 
-function PSKCapitalizeName(name)
-    return name:sub(1, 1):upper() .. name:sub(2):lower()
-end
+-- function PSKCapitalizeName(name)
+    -- return name:sub(1, 1):upper() .. name:sub(2):lower()
+-- end
 
 ------------------------------------------
 -- Function add player from slash command
 ------------------------------------------
 
-function PSK:AddPlayerFromCommand(name, listType, position)
-    -- Normalize and clean input
-    local rawName = Ambiguate(name, "short"):gsub("%s+", "")
-    local nameLower = rawName:lower()
-    local nameProper = PSKCapitalizeName(rawName)
+-- function PSK:AddPlayerFromCommand(name, listType, position)
+    -- -- Normalize and clean input
+    -- local rawName = Ambiguate(name, "short"):gsub("%s+", "")
+    -- local nameLower = rawName:lower()
+    -- local nameProper = PSKCapitalizeName(rawName)
 
-    -- Check if name is in player
-    local foundInPlayer = false
-    for i = 1, GetNumGuildMembers() do
-        local gName = GetGuildRosterInfo(i)
-        if gName and Ambiguate(gName, "short"):lower() == nameLower then
-            foundInPlayer = true
-            break
-        end
-    end
-
-    -- Check if name is in raid or party
-    local foundInRaidOrParty = false
-    local unit = nil
-
-    if IsInRaid() then
-        for i = 1, MAX_RAID_MEMBERS do
-            local u = "raid" .. i
-            if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
-                foundInRaidOrParty = true
-                unit = u
-                break
-            end
-        end
-    elseif IsInGroup() then
-        for i = 1, GetNumGroupMembers() - 1 do
-            local u = "party" .. i
-            if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
-                foundInRaidOrParty = true
-                unit = u
-                break
-            end
-        end
-    end
-	
-	-- -- Non-guild members can be added.
-    -- if not foundInPlayer and not foundInRaidOrParty then
-        -- print("[PSK] Error: '" .. nameProper .. "' is not in your player, raid, or party. Cannot add.")
-        -- return
+    -- -- Check if name is in player
+    -- local foundInPlayer = false
+    -- for i = 1, GetNumGuildMembers() do
+        -- local gName = GetGuildRosterInfo(i)
+        -- if gName and Ambiguate(gName, "short"):lower() == nameLower then
+            -- foundInPlayer = true
+            -- break
+        -- end
     -- end
 
-    -- Choose target list
-    local list = (listType == "tier") and PSKDB.TierList or PSKDB.MainList
+    -- -- Check if name is in raid or party
+    -- local foundInRaidOrParty = false
+    -- local unit = nil
 
-    -- Check for duplicates
-    for _, existing in ipairs(list) do
-        if Ambiguate(existing, "short"):lower() == nameLower then
-            print("[PSK] " .. nameProper .. " is already in the " .. listType .. " list.")
-            return
-        end
-    end
+    -- if IsInRaid() then
+        -- for i = 1, MAX_RAID_MEMBERS do
+            -- local u = "raid" .. i
+            -- if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
+                -- foundInRaidOrParty = true
+                -- unit = u
+                -- break
+            -- end
+        -- end
+    -- elseif IsInGroup() then
+        -- for i = 1, GetNumGroupMembers() - 1 do
+            -- local u = "party" .. i
+            -- if UnitExists(u) and Ambiguate(UnitName(u), "short"):lower() == nameLower then
+                -- foundInRaidOrParty = true
+                -- unit = u
+                -- break
+            -- end
+        -- end
+    -- end
+	
+	-- Non-guild members can be added.
+    -- -- if not foundInPlayer and not foundInRaidOrParty then
+    -- --     print("[PSK] Error: '" .. nameProper .. "' is not in your player, raid, or party. Cannot add.")
+    -- --     return
+    -- -- end
 
-    -- Add to top or bottom
-    if position == "top" then
-        table.insert(list, 1, nameProper)
-    else
-        table.insert(list, nameProper)
-    end
+    -- -- Choose target list
+    -- local list = (listType == "tier") and PSKDB.TierList or PSKDB.MainList
 
-    -- Fill in player data if not already in the DB
-    if not PSKDB.Players[nameProper] then
-        local class = "SHAMAN" 
-        local level = "???"
-        local zone = "Unknown"
-        local online = false
-        local inRaid = false
+    -- -- Check for duplicates
+    -- for _, existing in ipairs(list) do
+        -- if Ambiguate(existing, "short"):lower() == nameLower then
+            -- print("[PSK] " .. nameProper .. " is already in the " .. listType .. " list.")
+            -- return
+        -- end
+    -- end
 
-        -- Try guild roster first
-        for i = 1, GetNumGuildMembers() do
-            local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
-            if gName and Ambiguate(gName, "short"):lower() == nameLower then
-                class = gClassFile or class
-                level = gLevel or level
-                zone = gZone or zone
-                online = gOnline or false
-                break
-            end
-        end
+    -- -- Add to top or bottom
+    -- if position == "top" then
+        -- table.insert(list, 1, nameProper)
+    -- else
+        -- table.insert(list, nameProper)
+    -- end
 
-        -- If the player is in your raid or party, fill in more accurate data
-		if unit then
-			local _, classFile = UnitClass(unit)
-			class = classFile or class
-			level = UnitLevel(unit) or level
-			zone = GetZoneText()
-			online = UnitIsConnected(unit)
-			inRaid = UnitInRaid(unit) ~= nil
-		end
+    -- -- Fill in player data if not already in the DB
+    -- if not PSKDB.Players[nameProper] then
+        -- local class = "SHAMAN" 
+        -- local level = "???"
+        -- local zone = "Unknown"
+        -- local online = false
+        -- local inRaid = false
+
+        -- -- Try guild roster first
+        -- for i = 1, GetNumGuildMembers() do
+            -- local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
+            -- if gName and Ambiguate(gName, "short"):lower() == nameLower then
+                -- class = gClassFile or class
+                -- level = gLevel or level
+                -- zone = gZone or zone
+                -- online = gOnline or false
+                -- break
+            -- end
+        -- end
+
+        -- -- If the player is in your raid or party, fill in more accurate data
+		-- if unit then
+			-- local _, classFile = UnitClass(unit)
+			-- class = classFile or class
+			-- level = UnitLevel(unit) or level
+			-- zone = GetZoneText()
+			-- online = UnitIsConnected(unit)
+			-- inRaid = UnitInRaid(unit) ~= nil
+		-- end
 
 
-        PSKDB.Players[nameProper] = {
-            class = class,
-            online = online,
-            inRaid = inRaid,
-            level = level,
-            zone = zone,
-        }
+        -- PSKDB.Players[nameProper] = {
+            -- class = class,
+            -- online = online,
+            -- inRaid = inRaid,
+            -- level = level,
+            -- zone = zone,
+        -- }
 		
-		if not foundInPlayer and not foundInRaidOrParty then
-			print("[PSK] Warning: " .. nameProper .. " is not in your guild, raid, or party. Added with default info.")
-		end
-    end
+		-- if not foundInPlayer and not foundInRaidOrParty then
+			-- print("[PSK] Warning: " .. nameProper .. " is not in your guild, raid, or party. Added with default info.")
+		-- end
+    -- end
 
-    print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
-    PSK:DebouncedRefreshPlayerList()
-end
-
-
+    -- print("[PSK] Added " .. nameProper .. " to the " .. listType .. " list at the " .. position .. ".")
+    -- PSK:DebouncedRefreshPlayerLists()
+-- end
 
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 
-f:SetScript("OnEvent", function(self, event, ...)
-    if event == "PARTY_LOOT_METHOD_CHANGED" then
-        PSK:UpdateLootThresholdLabel()
-    end
-end)
+
+-- local f = CreateFrame("Frame")
+-- f:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
+
+-- f:SetScript("OnEvent", function(self, event, ...)
+    -- if event == "PARTY_LOOT_METHOD_CHANGED" then
+        -- PSK:UpdateLootThresholdLabel()
+    -- end
+-- end)

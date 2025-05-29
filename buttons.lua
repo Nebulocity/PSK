@@ -31,48 +31,72 @@ PSK.ToggleListButton:SetScript("OnClick", function()
 		PSK:PlayRandomPeonSound()
 	end
 
-    PSK:DebouncedRefreshPlayerList()
+    PSK:DebouncedRefreshPlayerLists()
     PSK:DebouncedRefreshBidList()
 	PSK:ClearSelection()
 end)
 
 
-------------------------------
--- Button to record loot drops
-------------------------------
+--------------------------------------------------------
+-- Add up/down list buttons, parent to PSK.Headers.Main
+--------------------------------------------------------
 
-PSK.RecordLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
-PSK.RecordLootButton:SetSize(140, 30)
-PSK.RecordLootButton:SetText("Record Loot")
-PSK.LootRecordingActive = false
+-- Move Up Button
+PSK.MoveUpButton = CreateFrame("Button", nil, PSK.ContentFrame, "UIPanelButtonTemplate")
+PSK.MoveUpButton:SetSize(32, 24)
+PSK.MoveUpButton:SetPoint("LEFT", PSK.Headers.Main, "RIGHT", 20, 0)
+PSK.MoveUpButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+PSK.MoveUpButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+PSK.MoveUpButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+PSK.MoveUpButton:Hide()
+PSK.MoveUpButton:SetScript("OnClick", function()
+	local list = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+    if not list or not PSK.SelectedPlayer then return end
 
-PSK.RecordLootButton:SetScript("OnClick", function(self)
-    PSK.LootRecordingActive = not PSK.LootRecordingActive
-	
-    if PSK.LootRecordingActive then
-        self:SetText("Stop Recording")
-
-		if PSK.RecordingWarningDrops then
-			PSK.RecordingWarningDrops:Hide()
-		end
-		
-		if PSK.RecordingWarningLogs then
-			PSK.RecordingWarningLogs:Hide()
-		end
-		
-    else
-        self:SetText("Record Loot")
-        
-		if PSK.RecordingWarningDrops then
-			PSK.RecordingWarningDrops:Show()
-		end
-		
-		if PSK.RecordingWarningLogs then
-			PSK.RecordingWarningLogs:Show()
-		end
-		
+    for i = 2, #list do
+        if list[i].name == PSK.SelectedPlayer then
+            local temp = list[i]
+            list[i] = list[i - 1]
+            list[i - 1] = temp
+            PSK.SelectedPlayer = list[i - 1].name
+            PSK:RefreshPlayerLists()
+            break
+        end
     end
+
+	-- Play sound
+	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 end)
+
+
+
+-- Move Down Button
+PSK.MoveDownButton = CreateFrame("Button", nil, PSK.ContentFrame, "UIPanelButtonTemplate")
+PSK.MoveDownButton:SetSize(32, 24)
+PSK.MoveDownButton:SetPoint("LEFT", PSK.Headers.Main, "RIGHT", 60, 0)
+PSK.MoveDownButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+PSK.MoveDownButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+PSK.MoveDownButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+PSK.MoveDownButton:Hide()
+PSK.MoveDownButton:SetScript("OnClick", function()
+    local list = (PSK.CurrentList == "Tier") and PSKDB.TierList or PSKDB.MainList
+    if not list or not PSK.SelectedPlayer then return end
+
+    for i = 1, #list - 1 do
+        if list[i].name == PSK.SelectedPlayer then
+            local temp = list[i]
+            list[i] = list[i + 1]
+            list[i + 1] = temp
+            PSK.SelectedPlayer = list[i + 1].name
+            PSK:RefreshPlayerLists()
+            break
+        end
+    end
+	
+	-- Play sound
+	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+end)
+
 
 
 ------------------------------
@@ -125,19 +149,20 @@ PSK.BidButton.biddingActive = false
 
 PSK.BidButton:SetScript("OnClick", function(self)
     self.biddingActive = not self.biddingActive
-	
+		
+	print("button clicked!")
 	
     if self.biddingActive then
 		PlaySound(5275)
 		self:SetText("Close Bidding")
 		
         -- Add logic for starting bidding phase here
-        Announce("[PSK] Bidding has begun! Whisper 'bid' to join.")
+        PSK:Announce("[PSK] Bidding has begun! Whisper 'bid' to join.")
     else
 		PlaySound(5274)
         self:SetText("Start Bidding")
         -- Add logic for closing bidding here
-        Announce("[PSK] Bidding has ended.")
+        PSK:Announce("[PSK] Bidding has ended.")
     end
 end)
 
@@ -222,7 +247,6 @@ local spacing = 20
 local buttonWidth = 140
 
 PSK.ToggleListButton:SetWidth(buttonWidth)
-PSK.RecordLootButton:SetWidth(buttonWidth)
 PSK.BidButton:SetWidth(buttonWidth)
 
 local totalWidth = buttonWidth * 3 + spacing * 2
@@ -230,13 +254,105 @@ local startX = -totalWidth / 2 + buttonWidth / 2
 
 -- Reset default positioning
 PSK.ToggleListButton:ClearAllPoints()
-PSK.RecordLootButton:ClearAllPoints()
 PSK.BidButton:ClearAllPoints()
 
-PSK.ToggleListButton:SetPoint("TOP", PSK.ContentFrame, "TOP", startX, -40)
-PSK.RecordLootButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", spacing, 0)
-PSK.BidButton:SetPoint("LEFT", PSK.RecordLootButton, "RIGHT", spacing, 0)
+PSK.ToggleListButton:SetPoint("TOPLEFT", PSK.ContentFrame, "TOPLEFT", 10, -60)
+PSK.BidButton:SetPoint("TOPRIGHT", PSK.ContentFrame, "TOPRIGHT", -95, -60)
 
 if PSK.FinalizeUI then
     PSK:FinalizeUI()
 end
+
+
+------------------------------
+-- Import Tier Button
+------------------------------
+
+local importTierButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+importTierButton:SetSize(120, 30)
+importTierButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -215, 30)
+importTierButton:SetText("Import (PSK)")
+importTierButton:SetScript("OnClick", function()
+    local json = PSK.TierListEditBox:GetText()
+    PSK:ImportPSKTierList(json)
+end)
+
+
+
+------------------------------
+-- Export Tier PSK Button
+------------------------------
+
+local exportTierButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportTierButton:SetSize(120, 30)
+exportTierButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT",  -65, 30)
+exportTierButton:SetText("Export (PSK)")
+exportTierButton:SetScript("OnClick", function()
+	PSK.TierListEditBox:SetText(PSK:ExportPSKTierList())
+	PSK.TierListEditBox:HighlightText()
+	PSK.TierListEditBox:SetFocus()
+end)
+
+
+
+------------------------------
+-- Export Tier Readable Button
+------------------------------
+
+local exportReadableTierButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportReadableTierButton:SetSize(120, 30)
+exportReadableTierButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -65, 0)
+exportReadableTierButton:SetText("Export (Discord)")
+exportReadableTierButton:SetScript("OnClick", function()
+	local mainList, tierList = PSK:ExportReadableLists()
+	PSK.TierListEditBox:SetText(tierList)
+	PSK.TierListEditBox:HighlightText()
+	PSK.TierListEditBox:SetFocus()
+	print("[PSK] Tier List Exported in readable format")
+end)
+
+
+
+------------------------------
+-- Export Main PSK Button
+------------------------------
+
+local exportMainButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportMainButton:SetSize(120, 30)
+exportMainButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT",  190, 30)
+exportMainButton:SetText("Export (PSK)")
+exportMainButton:SetScript("OnClick", function()
+    PSK.MainListEditBox:SetText(PSK:ExportPSKMainList())
+	PSK.MainListEditBox:HighlightText()
+	PSK.MainListEditBox:SetFocus()
+end)
+
+------------------------------
+-- Export Main Readable Button
+------------------------------
+
+local exportReadableMainButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportReadableMainButton:SetSize(120, 30)
+exportReadableMainButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 190, 0)
+exportReadableMainButton:SetText("Export (Discord)")
+exportReadableMainButton:SetScript("OnClick", function()
+	local mainList, tierList = PSK:ExportReadableLists()
+	PSK.MainListEditBox:SetText(mainList)
+	PSK.MainListEditBox:HighlightText()
+	PSK.MainListEditBox:SetFocus()
+	print("[PSK] Main List Exported in readable format")
+end)
+
+
+------------------------------
+-- Import Main Button
+------------------------------
+
+local importMainButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+importMainButton:SetSize(120, 30)
+importMainButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 30, 30)
+importMainButton:SetText("Import (PSK)")
+importMainButton:SetScript("OnClick", function()
+    local json = PSK.MainListEditBox:GetText()
+    PSK:ImportPSKMainList(json)
+end)
