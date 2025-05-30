@@ -225,12 +225,15 @@ end
 -----------------------------------------------------------
 
 function PSK:ReorderListOnAward(listName)
+
+	print("PSK:ReorderListOnAward(" .. listName .. ")")
+	
     local list = PSKDB[listName]
     if not list or type(list) ~= "table" then return end
 
     -- Remove the selected (awarded) player from the list
     for i = #list, 1, -1 do
-	if PSK.SelectedPlayer == Ambiguate(name, "short")
+	if PSK.SelectedPlayer == Ambiguate(name, "short") then
 	    table.remove(list, i)
 	    print("Removed " .. PSK.SelectedPlayer .. " from " .. listName)
 	    return
