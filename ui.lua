@@ -397,7 +397,7 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
 	OnAccept = function()
 		PSKDB.LootDrops = PSKDB.LootDrops or {}
 		wipe(PSKDB.LootDrops)
-		PSK:DebouncedRefreshLootList()
+		PSK:RefreshLootList()
 	end
 
 }

@@ -1,0 +1,768 @@
+
+PSKGlobal = {
+["RowPool"] = {
+},
+["ToggleListButton"] = {
+["fitTextWidthPadding"] = 40,
+["Right"] = {
+},
+["Middle"] = {
+},
+["Text"] = {
+},
+["Left"] = {
+},
+["fitTextCanWidthDecrease"] = true,
+},
+["ScrollFrames"] = {
+["Logs"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+["Loot"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+["TierAvailable"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+["Bid"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+["Main"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+["MainAvailable"] = {
+["ScrollBar"] = {
+["ScrollDownButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+["ThumbTexture"] = {
+},
+["ScrollUpButton"] = {
+["Normal"] = {
+},
+["Pushed"] = {
+},
+["Disabled"] = {
+},
+["Highlight"] = {
+},
+},
+},
+["offset"] = 0,
+},
+},
+["RarityNames"] = {
+"Common",
+"Uncommon",
+"Rare",
+"Epic",
+"Legendary",
+[0] = "Poor",
+},
+["Settings"] = {
+["lootThreshold"] = 3,
+},
+["MainListEditBox"] = {
+},
+["ImportExportFrame"] = {
+["BottomLeftCorner"] = {
+},
+["TopEdge"] = {
+},
+["BottomEdge"] = {
+},
+["TopRightCorner"] = {
+},
+["backdropInfo"] = {
+["bgFile"] = "Interface\\DialogFrame\\UI-DialogBox-Background",
+["tileSize"] = 16,
+["edgeFile"] = "Interface\\Tooltips\\UI-DialogBox-Border",
+["tile"] = true,
+["edgeSize"] = 16,
+["insets"] = {
+["top"] = 4,
+["right"] = 4,
+["left"] = 4,
+["bottom"] = 4,
+},
+},
+["LeftEdge"] = {
+},
+["BottomRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["RightEdge"] = {
+},
+["Center"] = {
+},
+},
+["BidEntries"] = {
+},
+["EventFrame"] = {
+},
+["SettingsFrame"] = {
+["BottomLeftCorner"] = {
+},
+["TopEdge"] = {
+},
+["BottomEdge"] = {
+},
+["Center"] = {
+},
+["LeftEdge"] = {
+},
+["CheckButton"] = {
+["Text"] = {
+},
+},
+["BottomRightCorner"] = {
+},
+["TopRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["RightEdge"] = {
+},
+["backdropInfo"] = {
+["bgFile"] = "Interface\\DialogFrame\\UI-DialogBox-Background",
+["tileSize"] = 16,
+["edgeFile"] = "Interface\\Tooltips\\UI-DialogBox-Border",
+["tile"] = true,
+["edgeSize"] = 16,
+["insets"] = {
+["top"] = 4,
+["right"] = 4,
+["left"] = 4,
+["bottom"] = 4,
+},
+},
+},
+["ContentFrame"] = {
+},
+["LogsFrame"] = {
+["BottomLeftCorner"] = {
+},
+["TopEdge"] = {
+},
+["BottomEdge"] = {
+},
+["TopRightCorner"] = {
+},
+["backdropInfo"] = {
+["bgFile"] = "Interface\\DialogFrame\\UI-DialogBox-Background",
+["tileSize"] = 16,
+["edgeFile"] = "Interface\\Tooltips\\UI-DialogBox-Border",
+["tile"] = true,
+["edgeSize"] = 16,
+["insets"] = {
+["top"] = 4,
+["right"] = 4,
+["left"] = 4,
+["bottom"] = 4,
+},
+},
+["LeftEdge"] = {
+},
+["BottomRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["RightEdge"] = {
+},
+["Center"] = {
+},
+},
+["CurrentList"] = "Main",
+["BidTimers"] = {
+},
+["RarityColors"] = {
+"ffffff",
+"1eff00",
+"0070dd",
+"a335ee",
+"ff8000",
+[0] = "9d9d9d",
+},
+["ScrollChildren"] = {
+["Logs"] = {
+},
+["Loot"] = {
+},
+["TierAvailable"] = {
+},
+["Bid"] = {
+},
+["Main"] = {
+},
+["MainAvailable"] = {
+},
+},
+["MoveUpButton"] = {
+["fitTextWidthPadding"] = 40,
+["Right"] = {
+},
+["Middle"] = {
+},
+["Text"] = {
+},
+["Left"] = {
+},
+["fitTextCanWidthDecrease"] = true,
+},
+["MainFrame"] = {
+["TitleText"] = {
+},
+["RightBorder"] = {
+},
+["LeftBorder"] = {
+},
+["InsetBorderTopLeft"] = {
+},
+["InsetBorderBottomRight"] = {
+},
+["TopRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["Bg"] = {
+},
+["BottomBorder"] = {
+},
+["InsetBorderBottomLeft"] = {
+},
+["TopBorder"] = {
+},
+["InsetBg"] = {
+},
+["TopTileStreaks"] = {
+},
+["InsetBorderBottom"] = {
+},
+["InsetBorderRight"] = {
+},
+["InsetBorderLeft"] = {
+},
+["CloseButton"] = {
+},
+["InsetBorderTop"] = {
+},
+["BotRightCorner"] = {
+},
+["title"] = {
+},
+["numTabs"] = 5,
+["BotLeftCorner"] = {
+},
+["InsetBorderTopRight"] = {
+},
+["selectedTab"] = 1,
+["TitleBg"] = {
+},
+},
+["TierListEditBox"] = {
+},
+["LootLabel"] = {
+},
+["Tabs"] = {
+{
+["selectedTextY"] = 4,
+},
+{
+["selectedTextY"] = 4,
+},
+{
+["selectedTextY"] = 4,
+},
+{
+["selectedTextY"] = 4,
+},
+{
+["selectedTextY"] = 4,
+},
+},
+["MoveDownButton"] = {
+["fitTextWidthPadding"] = 40,
+["Right"] = {
+},
+["Middle"] = {
+},
+["Text"] = {
+},
+["Left"] = {
+},
+["fitTextCanWidthDecrease"] = true,
+},
+["BidButton"] = {
+["Border"] = {
+["BottomLeftCorner"] = {
+},
+["TopEdge"] = {
+},
+["BottomEdge"] = {
+},
+["Pulse"] = {
+},
+["TopRightCorner"] = {
+},
+["backdropInfo"] = {
+["edgeSize"] = 15,
+["edgeFile"] = "Interface\\Tooltips\\UI-Tooltip-Border",
+},
+["LeftEdge"] = {
+},
+["BottomRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["RightEdge"] = {
+},
+["Center"] = {
+},
+},
+["fitTextWidthPadding"] = 40,
+["Middle"] = {
+},
+["Text"] = {
+},
+["fitTextCanWidthDecrease"] = true,
+["Right"] = {
+},
+["Left"] = {
+},
+["biddingActive"] = false,
+},
+["ClearLootButton"] = {
+["fitTextWidthPadding"] = 40,
+["Right"] = {
+},
+["Middle"] = {
+},
+["Text"] = {
+},
+["Left"] = {
+},
+["fitTextCanWidthDecrease"] = true,
+},
+["ManageFrame"] = {
+["BottomLeftCorner"] = {
+},
+["TopEdge"] = {
+},
+["BottomEdge"] = {
+},
+["TopRightCorner"] = {
+},
+["backdropInfo"] = {
+["bgFile"] = "Interface\\DialogFrame\\UI-DialogBox-Background",
+["tileSize"] = 16,
+["edgeFile"] = "Interface\\Tooltips\\UI-DialogBox-Border",
+["tile"] = true,
+["edgeSize"] = 16,
+["insets"] = {
+["top"] = 4,
+["right"] = 4,
+["left"] = 4,
+["bottom"] = 4,
+},
+},
+["LeftEdge"] = {
+},
+["BottomRightCorner"] = {
+},
+["TopLeftCorner"] = {
+},
+["RightEdge"] = {
+},
+["Center"] = {
+},
+},
+["Headers"] = {
+["Logs"] = {
+},
+["Loot"] = {
+},
+["TierAvailable"] = {
+},
+["Bid"] = {
+},
+["Main"] = {
+},
+["MainAvailable"] = {
+},
+},
+}
+PSKDB = {
+["TierList"] = {
+},
+["MainList"] = {
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Deyomas",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Boopw",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Hotbreath",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "WARLOCK",
+["name"] = "Araby",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "WARLOCK",
+["name"] = "Azgrend",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "SHAMAN",
+["name"] = "Bigstrongbul",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Chillemdefoe",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "SHAMAN",
+["name"] = "Chryttaesh",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "WARRIOR",
+["name"] = "Hevydevy",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Smungathon",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "HUNTER",
+["name"] = "Boopy",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "ROGUE",
+["name"] = "Brisketfiend",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Coldasa",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Darlye",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "ROGUE",
+["name"] = "Medji",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "MAGE",
+["name"] = "Boopx",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "DRUID",
+["name"] = "Moobeam",
+},
+{
+["dateLastRaided"] = "Never",
+["class"] = "SHAMAN",
+["name"] = "Taurbucks",
+},
+},
+["LootDrops"] = {
+{
+["itemTexture"] = 132911,
+["timestamp"] = "2025-05-31 11:49:31",
+["itemLink"] = "|cffffffff|Hitem:2592::::::::60:::::::::|h[Wool Cloth]|h|r",
+},
+{
+["itemTexture"] = 132905,
+["timestamp"] = "2025-05-31 11:52:06",
+["itemLink"] = "|cffffffff|Hitem:4306::::::::60:::::::::|h[Silk Cloth]|h|r",
+},
+{
+["itemTexture"] = 134937,
+["timestamp"] = "2025-05-31 11:52:08",
+["itemLink"] = "|cffffffff|Hitem:2290::::::::60:::::::::|h[Scroll of Intellect II]|h|r",
+},
+{
+["itemTexture"] = 134087,
+["timestamp"] = "2025-05-31 11:55:01",
+["itemLink"] = "|cff1eff00|Hitem:1705::::::::60:::::::::|h[Lesser Moonstone]|h|r",
+},
+{
+["itemTexture"] = 133978,
+["timestamp"] = "2025-05-31 12:01:34",
+["itemLink"] = "|cffffffff|Hitem:4538::::::::60:::::::::|h[Snapvine Watermelon]|h|r",
+},
+{
+["itemTexture"] = 135646,
+["timestamp"] = "2025-05-31 12:04:06",
+["itemLink"] = "|cffffffff|Hitem:6681::::::::60:::::::::|h[Thornspike]|h|r",
+},
+{
+["itemTexture"] = 135468,
+["timestamp"] = "2025-05-31 12:05:54",
+["itemLink"] = "|cff1eff00|Hitem:8186::::::::60:::::::::|h[Dire Wand]|h|r",
+},
+{
+["itemTexture"] = 135500,
+["timestamp"] = "2025-05-31 12:20:24",
+["itemLink"] = "|cff1eff00|Hitem:3037::::::::60:::::::::|h[Whipwood Recurve Bow]|h|r",
+},
+{
+["itemTexture"] = 133723,
+["timestamp"] = "2025-05-31 12:25:47",
+["itemLink"] = "|cff0070dd|Hitem:6691::::::::60:::::::::|h[Swinetusk Shank]|h|r",
+},
+{
+["itemTexture"] = 132796,
+["timestamp"] = "2025-05-31 12:28:52",
+["itemLink"] = "|cffffffff|Hitem:1205::::::::60:::::::::|h[Melon Juice]|h|r",
+},
+{
+["itemTexture"] = 132611,
+["timestamp"] = "2025-05-31 12:28:52",
+["itemLink"] = "|cff1eff00|Hitem:6602::::::590:770845824:60:::::::::|h[Dervish Bracers of the Monkey]|h|r",
+},
+{
+["itemTexture"] = 133722,
+["timestamp"] = "2025-05-31 12:30:45",
+["itemLink"] = "|cff0070dd|Hitem:6693::::::::60:::::::::|h[Agamaggan's Clutch]|h|r",
+},
+{
+["itemTexture"] = 135562,
+["timestamp"] = "2025-05-31 12:34:21",
+["itemLink"] = "|cff0070dd|Hitem:6687::::::::60:::::::::|h[Corpsemaker]|h|r",
+},
+{
+["itemTexture"] = 135128,
+["timestamp"] = "2025-05-31 12:34:24",
+["itemLink"] = "|cff1eff00|Hitem:6679::::::::60:::::::::|h[Armor Piercer]|h|r",
+},
+{
+["itemTexture"] = 132541,
+["timestamp"] = "2025-05-31 12:39:44",
+["itemLink"] = "|cff1eff00|Hitem:14742::::::::60:::::::::|h[Hulking Boots]|h|r",
+},
+{
+["itemTexture"] = 133972,
+["timestamp"] = "2025-05-31 12:39:59",
+["itemLink"] = "|cffffffff|Hitem:2677::::::::60:::::::::|h[Boar Ribs]|h|r",
+},
+{
+["itemTexture"] = 134342,
+["timestamp"] = "2025-05-31 12:39:59",
+["itemLink"] = "|cffffffff|Hitem:3172::::::::60:::::::::|h[Boar Intestines]|h|r",
+},
+{
+["itemTexture"] = 132611,
+["timestamp"] = "2025-05-31 12:40:01",
+["itemLink"] = "|cff1eff00|Hitem:15122::::::762:1348936192:60:::::::::|h[Robust Bracers of the Owl]|h|r",
+},
+{
+["itemTexture"] = 133346,
+["timestamp"] = "2025-05-31 12:48:52",
+["itemLink"] = "|cff1eff00|Hitem:12054::::::::60:::::::::|h[Demon Band]|h|r",
+},
+{
+["itemTexture"] = 132624,
+["timestamp"] = "2025-05-31 12:48:54",
+["itemLink"] = "|cff1eff00|Hitem:15514::::::939:1029587968:60:::::::::|h[Grunt's Chestpiece of the Gorilla]|h|r",
+},
+},
+["Settings"] = {
+["lootThreshold"] = 3,
+},
+["LootLogs"] = {
+{
+["player"] = "Taurbucks",
+["itemTexture"] = 133978,
+["class"] = "SHAMAN",
+["itemLink"] = "|cffffffff|Hitem:4538::::::::60:::::::::|h[Snapvine Watermelon]|h|r",
+["timestamp"] = "01:00PM 05/31/2025",
+},
+{
+["player"] = "Taurbucks",
+["itemTexture"] = 133722,
+["class"] = "SHAMAN",
+["itemLink"] = "|cff0070dd|Hitem:6693::::::::60:::::::::|h[Agamaggan's Clutch]|h|r",
+["timestamp"] = "01:02PM 05/31/2025",
+},
+{
+["player"] = "Hevydevy",
+["itemTexture"] = 135562,
+["class"] = "WARRIOR",
+["itemLink"] = "|cff0070dd|Hitem:6687::::::::60:::::::::|h[Corpsemaker]|h|r",
+["timestamp"] = "01:04PM 05/31/2025",
+},
+{
+["player"] = "Moobeam",
+["itemTexture"] = 133723,
+["class"] = "DRUID",
+["itemLink"] = "|cff0070dd|Hitem:6691::::::::60:::::::::|h[Swinetusk Shank]|h|r",
+["timestamp"] = "01:04PM 05/31/2025",
+},
+{
+["player"] = "Taurbucks",
+["itemTexture"] = 134087,
+["class"] = "SHAMAN",
+["itemLink"] = "|cff1eff00|Hitem:1705::::::::60:::::::::|h[Lesser Moonstone]|h|r",
+["timestamp"] = "01:45PM 05/31/2025",
+},
+{
+["player"] = "Taurbucks",
+["itemTexture"] = 134087,
+["class"] = "SHAMAN",
+["itemLink"] = "|cff1eff00|Hitem:1705::::::::60:::::::::|h[Lesser Moonstone]|h|r",
+["timestamp"] = "01:46PM 05/31/2025",
+},
+},
+}
+PSKBidList = nil
+PSKMinimapDB = nil

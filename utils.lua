@@ -137,10 +137,20 @@ function PerformAward(index)
 
 	-- Reorder standings based on current list and selected player
 	if PSK.SelectedPlayer then
+		PSK:Announce("PSK:ReorderListOnAward() called.")
 		PSK:ReorderListOnAward(PSK.CurrentList)
 	else
 		print("[PSK] Error: No selected player found to reorder list.")
 	end
+
+	-- Clear bidders after awarding
+	PSK.BidEntries = {}
+	PSK:RefreshBidList()
+
+	-- Clear selection
+	PSK.SelectedItem = nil
+	PSK.SelectedItemData = nil
+	PSK.SelectedLootRow = nil
 
 
 	-- Get class color
@@ -149,30 +159,34 @@ function PerformAward(index)
 
 	-- Get item details
 	local itemLink = PSK.SelectedItem
-	local itemName = GetItemInfo(itemLink) or itemLink
-	
+	local itemName = item.itemLink and GetItemInfo(item.itemLink) or "Unknown Item"
+
+
+	if itemLink then 
+		PSK:Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+	end
 	
 	-- Auto-award loot.
 	-- Only works with loot window open and player nearby.
 
-	local slotIndex = item.lootSlotIndex
-	local gaveLoot = false
+	-- local slotIndex = item.lootSlotIndex
+	-- local gaveLoot = false
 
-	if slotIndex then
-		for j = 1, GetNumGroupMembers() do
-			local candidateName = GetMasterLootCandidate(slotIndex, j)
-			if candidateName == PSK.SelectedPlayer then
-				GiveMasterLoot(slotIndex, j)
-				gaveLoot = true
-				Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
-				break
-			end
-		end
-	end
+	-- if slotIndex then
+		-- for j = 1, GetNumGroupMembers() do
+			-- local candidateName = GetMasterLootCandidate(slotIndex, j)
+			-- if candidateName == PSK.SelectedPlayer then
+				-- GiveMasterLoot(slotIndex, j)
+				-- gaveLoot = true
+				-- PSK:Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+				-- break
+			-- end
+		-- end
+	-- end
 
-	if not gaveLoot then
-		print("[PSK] Warning: Could not assign loot automatically. Please assign", itemLink, "to", playerName, "manually.")
-	end
+	-- if not gaveLoot then
+		-- print("[PSK] Warning: Could not assign loot automatically. Please assign", itemLink, "to", playerName, "manually.")
+	-- end
 
     -- Log the award
     PSKDB.LootLogs = PSKDB.LootLogs or {}
@@ -203,7 +217,6 @@ function PerformAward(index)
 		end
 	end
 
-
 	removeItemFromList(PSKDB.LootDrops)
 
 
@@ -211,8 +224,8 @@ function PerformAward(index)
         PSK:DebouncedRefreshLogList()
     end
 
-    PSK:DebouncedRefreshPlayerLists()
-    PSK:DebouncedRefreshBidList()
+    PSK:RefreshPlayerLists()
+    PSK:RefreshBidList()
     PlaySound(12867)
 end
 
@@ -225,25 +238,53 @@ end
 -----------------------------------------------------------
 
 function PSK:ReorderListOnAward(listName)
-
-	print("PSK:ReorderListOnAward(" .. listName .. ")")
-	
-    local list = PSKDB[listName]
-    if not list or type(list) ~= "table" then return end
-
-    -- Remove the selected (awarded) player from the list
-    for i = #list, 1, -1 do
-	if PSK.SelectedPlayer == Ambiguate(name, "short") then
-	    table.remove(list, i)
-	    print("Removed " .. PSK.SelectedPlayer .. " from " .. listName)
-	    return
-	end
+    if not listName or (listName ~= "Main" and listName ~= "Tier") then
+        PSK:Announce("[PSK] Invalid list name: " .. tostring(listName))
+        return
     end
 
-    -- Re-insert the selected player at the bottom of the list
-    table.insert(list, PSK.SelectedPlayer)
-    print("Moved " .. PSK.SelectedPlayer .. " to the bottom of " .. listName)
+    local list = (listName == "Main") and PSKDB.MainList or PSKDB.TierList
+    if not list or type(list) ~= "table" then
+        PSK:Announce("[PSK] List not found or invalid: " .. tostring(listName))
+        return
+    end
+
+    local awarded = PSK.SelectedPlayer
+    if not awarded then
+        PSK:Announce("[PSK] No player selected for awarding.")
+        return
+    end
+
+    local shortAwarded = Ambiguate(awarded, "short")
+
+	-- Remove awarded player from the list (match by name)
+    local awardedEntry
+    for i = #list, 1, -1 do
+        local entry = list[i]
+        if type(entry) == "table" and entry.name and Ambiguate(entry.name, "short") == shortAwarded then
+            awardedEntry = table.remove(list, i)
+            break
+        end
+    end
+
+	-- Re-insert at the bottom
+    table.insert(list, awardedEntry)
 	
+    -- Track original positions
+    local originalIndex = {}
+    for i, entry in ipairs(list) do
+        if type(entry) == "table" and entry.name then
+            originalIndex[Ambiguate(entry.name, "short")] = i
+        else
+            PSK:Announce(string.format("[PSK] Skipping invalid entry at index %d: %s", i, tostring(entry)))
+        end
+    end
+
+    if not awardedEntry then
+        PSK:Announce("[PSK] Could not find awarded player in list: " .. shortAwarded)
+        return
+    end  
+
     -- Build raid lookup
     local raidLookup = {}
     for i = 1, GetNumGroupMembers() do
@@ -253,82 +294,65 @@ function PSK:ReorderListOnAward(listName)
         end
     end
 
-    -- Annotate entries
-    local workingList = {}
-    for index, name in ipairs(list) do
-        local shortName = Ambiguate(name, "short")
-        local isRaid = raidLookup[shortName] or false
-        local isOnline = PSK.IsGuildMemberOnline and PSK:IsGuildMemberOnline(shortName)
-        local status = isRaid and "In Raid" or (isOnline and "Online" or "Offline")
-        table.insert(workingList, {
-            name = name,
-            status = status,
-            isRaid = isRaid,
-            originalIndex = index
-        })
-    end
-
-    -- Debug: BEFORE
-    print("---- BEFORE SHIFT (" .. listName .. ") ----")
-    for i, entry in ipairs(workingList) do
-        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
-    end
-
-    -- Perform the shift
-    local i = 1
-    while i < #workingList do
-        local current = workingList[i]
-        local nextEntry = workingList[i + 1]
-
-        if not current.isRaid and nextEntry.isRaid then
-            -- Swap to move raid member up
-            workingList[i], workingList[i + 1] = nextEntry, current
-            if i > 1 then
-                i = i - 1
-            else
-                i = i + 1
+    -- Bubble raid members over non-raid members (except awarded at bottom)
+    for i = #list - 1, 2, -1 do
+        local curr = list[i]
+        local prev = list[i - 1]
+        if curr and prev and curr.name and prev.name then
+            local sc = Ambiguate(curr.name, "short")
+            local sp = Ambiguate(prev.name, "short")
+            if raidLookup[sc] and not raidLookup[sp] then
+                list[i], list[i - 1] = list[i - 1], list[i]
             end
-        else
-            i = i + 1
         end
     end
 
-    -- Apply sorted names back to list
-    for i = 1, #list do
-        list[i] = workingList[i].name
+    -- Edge case for first two entries
+    if #list >= 2 and list[1] and list[2] and list[1].name and list[2].name then
+        local s1 = Ambiguate(list[1].name, "short")
+        local s2 = Ambiguate(list[2].name, "short")
+        if raidLookup[s2] and not raidLookup[s1] then
+            list[1], list[2] = list[2], list[1]
+        end
     end
 
-    -- Debug: AFTER
-    print("---- AFTER SHIFT (" .. listName .. ") ----")
-    for i, entry in ipairs(workingList) do
-        print(i .. " - " .. entry.name .. " (" .. entry.status .. ")")
-    end
-
-    -- Build and return a diff
+    -- Build diff
     local diff = {}
-    for i, entry in ipairs(workingList) do
-        if i ~= entry.originalIndex then
-            table.insert(diff, {
-                name = entry.name,
-                from = entry.originalIndex,
-                to = i,
-                status = entry.status
-            })
+    for i, entry in ipairs(list) do
+        if type(entry) == "table" and entry.name then
+            local shortName = Ambiguate(entry.name, "short")
+            local from = originalIndex[shortName]
+            if from and from ~= i then
+                table.insert(diff, {
+                    name = shortName,
+                    from = from,
+                    to = i,
+                    status = raidLookup[shortName] and "Raid" or "Non-Raid"
+                })
+            end
         end
     end
 
-    -- Optional: print diff for debugging
-    if #diff > 0 then
-        print("---- MOVEMENT SUMMARY ----")
-        for _, entry in ipairs(diff) do
-            print(entry.name .. " (" .. entry.status .. ") moved from position " .. entry.from .. " to " .. entry.to)
-        end
+    -- 📢 Announce movements
+    PSK:Announce("---- [PSK] List Reordered ----")
+    if #diff == 0 then
+        PSK:Announce("No players moved.")
     else
-        print("---- NO MOVEMENT ----")
+        for _, entry in ipairs(diff) do
+            PSK:Announce(string.format("%s (%s) moved from %d to %d", entry.name, entry.status, entry.from, entry.to))
+        end
     end
-
-    return diff
+    PSK:Announce(string.format("%s was awarded and moved to the bottom.", shortAwarded))
 end
+
+
+
+
+function PSK:SafeAmbiguate(name)
+    return name and Ambiguate(name, "short") or ""
+end
+
+
 
 -- function PSK:ReorderListOnAward(listName, awardedPlayer)
     -- local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
@@ -770,9 +794,9 @@ function PSK:RefreshPlayerLists()
 		end
 		return
 	end
-	
+
     if not PSKDB or not PSK.CurrentList then return end
-	
+
     local scrollChild = PSK.ScrollChildren.Main
     local header = PSK.Headers.Main
     if not scrollChild or not header then return end
@@ -969,31 +993,32 @@ function PSK:RefreshPlayerLists()
         end
 		
         -- Tooltip
-		if not row.tooltipBound then
-			row:SetScript("OnEnter", function(self)
-				if self.playerData then
-				
-					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-					GameTooltip:ClearLines()
-					local tcoords = CLASS_ICON_TCOORDS[class]
-					if tcoords then
-						local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
-							tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
-						GameTooltip:AddLine(icon .. name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
-					else
-						GameTooltip:AddLine(self.playerData.name or "Unknown")
-					end
+		row:SetScript("OnEnter", function(self)
+			if self.playerData then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:ClearLines()
 
-					GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
-					GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
-					GameTooltip:AddLine("Last Raided: " .. self.playerData.dateLastRaided, 0.8, 0.8, 0.8)
-					GameTooltip:Show()
+				local class = self.playerData.class or "SHAMAN"
+				local name = self.playerData.name or "Unknown"
+				local tcoords = CLASS_ICON_TCOORDS[class]
+				if tcoords then
+					local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
+						tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
+					local classColor = RAID_CLASS_COLORS[class] or {r = 1, g = 1, b = 1}
+					GameTooltip:AddLine(icon .. name, classColor.r, classColor.g, classColor.b)
+				else
+					GameTooltip:AddLine(name)
 				end
-			end)
-			row:SetScript("OnLeave", GameTooltip_Hide)
-			
-			row.tooltipBound = true
-		end 
+
+				GameTooltip:AddLine("Level: " .. tostring(self.playerData.level), 0.8, 0.8, 0.8)
+				GameTooltip:AddLine("Location: " .. tostring(self.playerData.zone), 0.8, 0.8, 0.8)
+				GameTooltip:AddLine("Last Raided: " .. tostring(self.playerData.dateLastRaided), 0.8, 0.8, 0.8)
+				GameTooltip:Show()
+			end
+		end)
+
+		row:SetScript("OnLeave", GameTooltip_Hide)
+
 		
         yOffset = yOffset - 22
     end
@@ -1188,18 +1213,32 @@ function PSK:RefreshAvailablePlayerLists()
         addButton:SetText("+")
         addButton:SetPoint("LEFT", row, "LEFT", 0, 0)
         addButton:SetScript("OnClick", function()
-            local list = (parent == mainChild) and PSKDB.MainList or PSKDB.TierList
-            
+			addButton:Disable()
+			C_Timer.After(0.5, function() addButton:Enable() end)
+
+			local listName = (parent == mainChild) and "Main" or "Tier"
+			local list = (listName == "Main") and PSKDB.MainList or PSKDB.TierList
+
+			-- Prevent duplicate entries
+			for _, entry in ipairs(list) do
+				if type(entry) == "table" and entry.name == player.name then
+					print("[PSK] " .. player.name .. " is already in the " .. listName .. " list.")
+					return
+				end
+			end
+
 			table.insert(list, {
 				name = player.name,
 				class = player.class or "UNKNOWN",
 				dateLastRaided = "Never"
 			})
-			
-            PSK:DebouncedRefreshAvailablePlayerLists()
-            -- PSK:DebouncedRefreshPlayerLists()
-            print("[PSK] Added " .. player.name .. " to the " .. ((parent == mainChild) and "Main" or "Tier") .. " List.")
-        end)
+
+			PSK:DebouncedRefreshAvailablePlayerLists()
+			PSK:DebouncedRefreshPlayerLists()
+			print("[PSK] Added " .. player.name .. " to the " .. listName .. " List.")
+		end)
+
+
 
         -- Class Icon
         local classIcon = row:CreateTexture(nil, "ARTWORK")
@@ -1410,6 +1449,7 @@ function PSK:RefreshBidList()
 				pulse:Play()
 			end
 
+			PSK.SelectedPlayer = bidData.name
 			PSK:AwardPlayer(safeIndex)
 		end)
 		

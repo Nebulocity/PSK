@@ -19,7 +19,7 @@ PSK.Settings = CopyTable(PSKDB.Settings)
 
 -- Set default loot threshold if not present
 if not PSKDB.Settings.lootThreshold then
-    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or 3
+    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or 1
 	PSKDB.Settings.lootThreshold = PSK.Settings.lootThreshold
 end
 
@@ -133,7 +133,7 @@ lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 	if #lootLinks > 0 then
 		local message = "[PSK] Loot Bag: " .. table.concat(lootLinks, ", ")
 		PSK:Announce(message)
-		PSK:DebouncedRefreshLootList()
+		PSK:RefreshLootList()
 		local lootLinks = {}
 	end
 	
@@ -295,7 +295,6 @@ end
 ----------------------------------------
 -- Auto-Refresh Player Lists on Events
 ----------------------------------------
-
 PSK.EventFrame = CreateFrame("Frame")
 PSK.EventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 PSK.EventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
@@ -305,23 +304,50 @@ PSK.EventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
 PSK.EventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 PSK.EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-
 PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
+    -- Events where we trigger a guild roster scan
+    if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_GUILD_UPDATE" then
+        GuildRoster() -- request update; we'll handle actual refresh in GUILD_ROSTER_UPDATE
+        return
+    end
 
-    if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_FLAGS_CHANGED" then
-        PSK:DebouncedRefreshPlayerLists()
-        -- PSK:DebouncedRefreshBidList()
-    elseif event == "GUILD_ROSTER_UPDATE" then
-		-- PSK:DebouncedRefreshAvailablePlayerLists()
-        -- PSK:DebouncedRefreshPlayerLists()
-    elseif event == "LOOT_OPENED" then
+    -- When the roster update data has arrived
+    if event == "GUILD_ROSTER_UPDATE" then
+        print("Refreshing both Main and Tier player lists after guild roster update")
+        if PSK and PSK.RefreshAvailableMembers then
+            PSK:DebouncedRefreshAvailablePlayerList()
+        end
+        if PSK and PSK.CurrentList then
+            local original = PSK.CurrentList
+            PSK.CurrentList = "Main"
+            PSK:DebouncedRefreshPlayerLists()
+            PSK.CurrentList = "Tier"
+            PSK:DebouncedRefreshPlayerLists()
+            PSK.CurrentList = original
+        end
+        return
+    end
+
+    -- Handle group/raid changes
+    if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_FLAGS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        print("Refreshing player lists due to group/raid changes")
+        if PSK and PSK.CurrentList then
+            local original = PSK.CurrentList
+            PSK.CurrentList = "Main"
+            PSK:DebouncedRefreshPlayerLists()
+            PSK.CurrentList = "Tier"
+            PSK:DebouncedRefreshPlayerLists()
+            PSK.CurrentList = original
+        end
+        return
+    end
+
+    -- Loot opened
+    if event == "LOOT_OPENED" then
         PSK:DebouncedRefreshLootList()
         PSK:DebouncedRefreshLogList()
     end
 end)
-
--- print("[PSK] Auto-Refresh Enabled for Guild, Party, and Raid Events")
-
 
 
 
