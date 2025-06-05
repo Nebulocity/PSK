@@ -19,7 +19,7 @@ PSK.Settings = CopyTable(PSKDB.Settings)
 
 -- Set default loot threshold if not present
 if not PSKDB.Settings.lootThreshold then
-    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or 1
+    PSK.Settings.lootThreshold = PSK.Settings.lootThreshold or 4
 	PSKDB.Settings.lootThreshold = PSK.Settings.lootThreshold
 end
 
@@ -46,6 +46,7 @@ PSK.RarityNames = {
 BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
+PSK.RollResults = PSK.RollResults or {}
 
 -- Holds timer references, so they can be started/stopped manually.
 PSK.BidTimers = {}
@@ -82,7 +83,7 @@ PSK.BidTimers = {}
 ----------------------------------------
 
 ----------------------------------------
--- Event frame for loot master looting
+-- Event frame for looting
 ----------------------------------------
 
 local lootViewFrame = CreateFrame("Frame")
@@ -90,7 +91,7 @@ lootViewFrame:RegisterEvent("LOOT_OPENED")
 
 lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 
-    if not IsMasterLooter() then return end
+    -- if not IsMasterLooter() then return end
     if not PSK.Settings or not PSK.Settings.lootThreshold then return end
 
     local numItems = GetNumLootItems()
@@ -150,7 +151,7 @@ end)
 -- thresholdFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 -- thresholdFrame:SetScript("OnEvent", function(self, event, ...)
     -- if event == "PARTY_LOOT_METHOD_CHANGED" then
-        -- local newThreshold = GetLootThreshold() or 3
+        -- local newThreshold = GetLootThreshold() or 4
 
         -- -- Update PSK settings
         -- PSK.Settings.lootThreshold = newThreshold
@@ -186,9 +187,20 @@ function PSK:StartBidding()
 	
 	-- Clear old timers just in case
 	PSK.BidTimers = {}
-
     PSK.BidEntries = {}
 	
+	-- Cancel any active roll timers before starting new bidding
+	if PSK.RollTimers then
+		for _, timer in ipairs(PSK.RollTimers) do
+			if timer.Cancel then
+				timer:Cancel()
+			end
+		end
+	end
+
+	PSK.RollTimers = {}
+	PSK.RollTimerActive = false
+
 	if PSK.BidButton then
         PSK.BidButton:SetText("Stop Bidding")
 		
@@ -252,12 +264,39 @@ function PSK:CloseBidding()
         end
     end
 	
+	local itemLink = PSK.SelectedItem
+	local itemName = GetItemInfo(itemLink) or itemLink
+	
     PSK.BidTimers = {}
+	PSK.RollTimers = {}
+	PSK.RollTimerActive = false
 	
     PSK:RefreshBidList()
 
     if #PSK.BidEntries == 0 then
 		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
+		SendChatMessage("[PSK] Proceeding to roll-off!", "RAID_WARNING")
+		PSK:Announce("/roll 100 for MS, /roll 99 for OS!")
+
+		-- Start 20 second timer
+		PSK.RollTimerActive = true
+		
+		local rollTimer = C_Timer.After(20, function()
+			PSK:EvaluateRolls(itemLink)
+			PSK.RollTimerActive = false
+			PSK:CancelRollTimers()
+		end)
+		
+		-- Countdown Messages
+		local countdownTimes = {20, 15, 10, 5, 4, 3, 2, 1}
+		for _, seconds in ipairs(countdownTimes) do
+			local timer = C_Timer.NewTimer(20 - seconds, function()
+				PSK:Announce("[PSK] " .. seconds .. " seconds left to roll on " .. itemLink .. "!")
+			end)
+			table.insert(PSK.RollTimers, timer)
+		end
+	
+		table.insert(PSK.RollTimers, rollTimer)
     else
 		SendChatMessage("[PSK] Bidding closed. Bidders:", "RAID_WARNING")
         
@@ -291,6 +330,47 @@ function PSK:CloseBidding()
 
     end
 end
+
+
+----------------------------------------
+-- Roll-off if no bids were placed
+----------------------------------------
+
+function PSK:EvaluateRolls(itemLink)
+    if not PSK.RollTimerActive then return end  
+
+    local mainSpecWinner = nil
+    local offSpecWinner = nil
+    local highestMainRoll = -1
+    local highestOffRoll = -1
+
+    for player, data in pairs(PSK.RollResults) do
+        if data.min == 1 and data.max == 100 then
+            if data.roll > highestMainRoll then
+                highestMainRoll = data.roll
+                mainSpecWinner = player
+            end
+        elseif data.min == 1 and data.max == 99 then
+            if data.roll > highestOffRoll then
+                highestOffRoll = data.roll
+                offSpecWinner = player
+            end
+        end
+    end
+
+    if mainSpecWinner then
+        PSK:Announce(string.format("[PSK] %s wins %s with a Main Spec roll of %d!", mainSpecWinner, itemLink or "", highestMainRoll))
+    elseif offSpecWinner then
+        PSK:Announce(string.format("[PSK] %s wins %s with an Off Spec roll of %d!", offSpecWinner, itemLink or "", highestOffRoll))
+    else
+        PSK:Announce("[PSK] No valid rolls detected.")
+    end
+
+	
+    wipe(PSK.RollResults)
+end
+
+
 
 ----------------------------------------
 -- Auto-Refresh Player Lists on Events
@@ -352,9 +432,9 @@ end)
 
 
 
-------------------------------------------
--- Scan these channels for the word "bid"
-------------------------------------------
+-------------------------------------------------------
+-- Scan these channels for the word "bid" or for rolls
+-------------------------------------------------------
 
 local chatFrame = CreateFrame("Frame")
 chatFrame:RegisterEvent("CHAT_MSG_RAID")
@@ -364,6 +444,7 @@ chatFrame:RegisterEvent("CHAT_MSG_SAY")
 chatFrame:RegisterEvent("CHAT_MSG_WHISPER")
 chatFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
 chatFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
+chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 
 chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
     if not BiddingOpen then return end
@@ -387,7 +468,61 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
     if msg:find("retract") then
         RetractBid(simpleName)
     end
+	
+	-- Capture rolls during an active roll-off
+	if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
+		local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
+		if player and roll and low and high then
+			if not PSK.RollResults then PSK.RollResults = {} end
+			PSK.RollResults[player] = {
+				roll = tonumber(roll),
+				min = tonumber(low),
+				max = tonumber(high),
+				timestamp = GetTime()
+			}
+			print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
+		end
+	end
 end)
+
+
+local rollFrame = CreateFrame("Frame")
+chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+
+chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
+	-- Capture rolls during an active roll-off
+	if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
+		local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
+		if player and roll and low and high then
+			if not PSK.RollResults then PSK.RollResults = {} end
+			PSK.RollResults[player] = {
+				roll = tonumber(roll),
+				min = tonumber(low),
+				max = tonumber(high),
+				timestamp = GetTime()
+			}
+			print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
+		end
+	end
+end)
+
+
+
+------------------------------------------
+-- Cancel roll timers
+------------------------------------------
+
+function PSK:CancelRollTimers()
+    if PSK.RollTimers then
+        for _, timer in ipairs(PSK.RollTimers) do
+            if timer.Cancel then
+                timer:Cancel()
+            end
+        end
+    end
+    PSK.RollTimers = {}
+    PSK.RollTimerActive = false
+end
 
 
 ------------------------------------------
