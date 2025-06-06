@@ -47,6 +47,7 @@ BiddingOpen = false
 PSK.BidEntries = {}
 PSK.CurrentList = "Main"
 PSK.RollResults = PSK.RollResults or {}
+PSK.ManualCancel = false
 
 -- Holds timer references, so they can be started/stopped manually.
 PSK.BidTimers = {}
@@ -219,7 +220,7 @@ function PSK:StartBidding()
 	
     -- Use the full item link for clickable text
 	
-	SendChatMessage("[PSK] [" .. listName .. "] Bidding has started for " .. itemLink .. "! 20 seconds remaining.", "RAID_WARNING")
+	SendChatMessage("[PSK] [" .. listName .. "] Bidding has started for " .. itemLink .. "!", "RAID_WARNING")
 	PSK:Announce("[PSK] Type 'bid' in /raid, /party, or /whisper to bid.")
 	PSK:Announce("[PSK] Type 'retract' in /raid, /party, or /whisper to retract.")
 	PSK:Announce("[PSK] -----------------------------------------------------------------")
@@ -238,7 +239,7 @@ function PSK:StartBidding()
     -- Auto-close timer
 	local closeTimer = C_Timer.NewTimer(20, function()
 		if BiddingOpen then
-			PSK:CloseBidding()
+			PSK:CloseBidding(false)
 		end
 	end)
 	table.insert(PSK.BidTimers, closeTimer)
@@ -251,7 +252,7 @@ end
 -- Close Bidding
 ----------------------------------------
 
-function PSK:CloseBidding()
+function PSK:CloseBidding(suppressRoll)
     BiddingOpen = false
     PSK.BidButton:SetText("Start Bidding")
 	
@@ -264,39 +265,50 @@ function PSK:CloseBidding()
         end
     end
 	
+	if PSK.RollTimers then
+        for _, timer in ipairs(PSK.RollTimers) do
+            if timer.Cancel then
+                timer:Cancel()
+            end
+        end
+    end
+	
 	local itemLink = PSK.SelectedItem
 	local itemName = GetItemInfo(itemLink) or itemLink
 	
     PSK.BidTimers = {}
 	PSK.RollTimers = {}
 	PSK.RollTimerActive = false
-	
+	wipe(PSK.RollResults)
     PSK:RefreshBidList()
 
     if #PSK.BidEntries == 0 then
-		SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
-		SendChatMessage("[PSK] Proceeding to roll-off!", "RAID_WARNING")
-		PSK:Announce("/roll 100 for MS, /roll 99 for OS!")
+		if suppressRoll == false then
+		
+			SendChatMessage("[PSK] No bids were placed.", "RAID_WARNING")
+			SendChatMessage("[PSK] Proceeding to roll-off!", "RAID_WARNING")
+			PSK:Announce("[PSK] /roll 100 for MS, /roll 99 for OS!")
 
-		-- Start 20 second timer
-		PSK.RollTimerActive = true
-		
-		local rollTimer = C_Timer.After(20, function()
-			PSK:EvaluateRolls(itemLink)
-			PSK.RollTimerActive = false
-			PSK:CancelRollTimers()
-		end)
-		
-		-- Countdown Messages
-		local countdownTimes = {20, 15, 10, 5, 4, 3, 2, 1}
-		for _, seconds in ipairs(countdownTimes) do
-			local timer = C_Timer.NewTimer(20 - seconds, function()
-				PSK:Announce("[PSK] " .. seconds .. " seconds left to roll on " .. itemLink .. "!")
+			-- Start 20 second timer
+			PSK.RollTimerActive = true
+			
+			local rollTimer = C_Timer.After(20, function()
+				PSK:EvaluateRolls(itemLink)
+				PSK.RollTimerActive = false
+				PSK:CancelRollTimers()
 			end)
-			table.insert(PSK.RollTimers, timer)
+			
+			-- Countdown Messages
+			local countdownTimes = {20, 15, 10, 5, 4, 3, 2, 1}
+			for _, seconds in ipairs(countdownTimes) do
+				local timer = C_Timer.NewTimer(20 - seconds, function()
+					PSK:Announce("[PSK] " .. seconds .. " seconds left to roll on " .. itemLink .. "!")
+				end)
+				table.insert(PSK.RollTimers, timer)
+			end
+		
+			table.insert(PSK.RollTimers, rollTimer)
 		end
-	
-		table.insert(PSK.RollTimers, rollTimer)
     else
 		SendChatMessage("[PSK] Bidding closed. Bidders:", "RAID_WARNING")
         
@@ -310,7 +322,6 @@ function PSK:CloseBidding()
 			indexMap[entry.name] = i
 		end
 
-		
 		-- Sort bids by position in list, unknowns to bottom
 		table.sort(PSK.BidEntries, function(a, b)
 			local aIndex = indexMap[a.name] or math.huge
@@ -339,38 +350,72 @@ end
 function PSK:EvaluateRolls(itemLink)
     if not PSK.RollTimerActive then return end  
 
-    local mainSpecWinner = nil
-    local offSpecWinner = nil
-    local highestMainRoll = -1
-    local highestOffRoll = -1
+	local highestMainRoll = -1
+	local highestOffRoll = -1
+	local mainSpecWinners = {}
+	local offSpecWinners = {}
 
     for player, data in pairs(PSK.RollResults) do
         if data.min == 1 and data.max == 100 then
             if data.roll > highestMainRoll then
-                highestMainRoll = data.roll
-                mainSpecWinner = player
-            end
+				highestMainRoll = data.roll
+				mainSpecWinners = { player }
+			elseif data.roll == highestMainRoll then
+				table.insert(mainSpecWinners, player)
+			end
         elseif data.min == 1 and data.max == 99 then
-            if data.roll > highestOffRoll then
-                highestOffRoll = data.roll
-                offSpecWinner = player
-            end
+			if data.roll > highestOffRoll then
+				highestOffRoll = data.roll
+				offSpecWinners = { player }
+			elseif data.roll == highestMainRoll then
+				table.insert(offSpecWinners, player)
+			end
         end
     end
 
-    if mainSpecWinner then
-        PSK:Announce(string.format("[PSK] %s wins %s with a Main Spec roll of %d!", mainSpecWinner, itemLink or "", highestMainRoll))
-    elseif offSpecWinner then
-        PSK:Announce(string.format("[PSK] %s wins %s with an Off Spec roll of %d!", offSpecWinner, itemLink or "", highestOffRoll))
-    else
-        PSK:Announce("[PSK] No valid rolls detected.")
-    end
+    
+	if #mainSpecWinners > 0 then
+		if #mainSpecWinners == 1 then
+			PSK:Announce(string.format("[PSK] %s wins %s with a Main Spec roll of %d!", PSK.CapitalizeName(mainSpecWinners[1]), itemLink or "", highestMainRoll))
+		else
+			PSK:Announce(string.format("[PSK] Tie detected for Main Spec roll of %d between: %s", highestMainRoll, table.concat(mainSpecWinners, ", ")))
+			-- Optional: trigger a second roll-off among them or ask for a reroll
+		end
+	elseif #offSpecWinners > 0 then
+		if #offSpecWinners == 1 then
+			PSK:Announce(string.format("[PSK] %s wins %s with an Off Spec roll of %d!", PSK.CapitalizeName(offSpecWinners[1]), itemLink or "", highestOffRoll))
+		else
+			PSK:Announce(string.format("[PSK] Tie detected for Off Spec roll of %d between: %s", highestOffRoll, table.concat(offSpecWinners, ", ")))
+			-- Optional: trigger a second roll-off among them or ask for a reroll
+		end
+	else
+		PSK:Announce("[PSK] No valid rolls detected.")
+	end
+
 
 	
     wipe(PSK.RollResults)
 end
 
 
+
+----------------------------------------
+PSK.RosterFrame = CreateFrame("Frame")
+PSK.RosterFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+PSK.RosterFrame:SetScript("OnEvent", function(_, event, ...)
+	if PSK and PSK.RefreshAvailableMembers then
+		PSK:DebouncedRefreshAvailablePlayerList()
+	end
+		
+	if PSK and PSK.CurrentList then
+		local original = PSK.CurrentList
+		PSK.CurrentList = "Main"
+		PSK:DebouncedRefreshPlayerLists()
+		PSK.CurrentList = "Tier"
+		PSK:DebouncedRefreshPlayerLists()
+		PSK.CurrentList = original
+	end
+end)
 
 ----------------------------------------
 -- Auto-Refresh Player Lists on Events
@@ -386,27 +431,7 @@ PSK.EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 PSK.EventFrame:SetScript("OnEvent", function(_, event, ...)
     -- Events where we trigger a guild roster scan
-    if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_GUILD_UPDATE" then
-        GuildRoster() -- request update; we'll handle actual refresh in GUILD_ROSTER_UPDATE
-        return
-    end
-
-    -- When the roster update data has arrived
-    if event == "GUILD_ROSTER_UPDATE" then
-        print("Refreshing both Main and Tier player lists after guild roster update")
-        if PSK and PSK.RefreshAvailableMembers then
-            PSK:DebouncedRefreshAvailablePlayerList()
-        end
-        if PSK and PSK.CurrentList then
-            local original = PSK.CurrentList
-            PSK.CurrentList = "Main"
-            PSK:DebouncedRefreshPlayerLists()
-            PSK.CurrentList = "Tier"
-            PSK:DebouncedRefreshPlayerLists()
-            PSK.CurrentList = original
-        end
-        return
-    end
+	GuildRoster()
 
     -- Handle group/raid changes
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_FLAGS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
@@ -447,7 +472,8 @@ chatFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
 chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 
 chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
-    if not BiddingOpen then return end
+    if not BiddingOpen and not PSK.RollTimerActive then return end
+
     if not sender then return end
 
     -- Ignore messages from the addon itself
@@ -469,42 +495,67 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
         RetractBid(simpleName)
     end
 	
-	-- Capture rolls during an active roll-off
+	-- Capture rolls during an active roll-off (raid only!)
 	if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
+		
 		local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
+		
 		if player and roll and low and high then
-			if not PSK.RollResults then PSK.RollResults = {} end
-			PSK.RollResults[player] = {
-				roll = tonumber(roll),
-				min = tonumber(low),
-				max = tonumber(high),
-				timestamp = GetTime()
-			}
-			print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
+		
+			-- Verify player is in the raid
+			local isInRaid = false
+			
+			for i = 1, MAX_RAID_MEMBERS do
+				local unit = "raid" .. i
+				
+				local unitName = Ambiguate(UnitName(unit), "short"):lower()
+				local rollName = Ambiguate(player, "short"):lower()
+				
+				if UnitExists(unit) and unitName == rollName then
+					isInRaid = true
+					break
+				end
+
+			end
+
+			if isInRaid then
+				if not PSK.RollResults then PSK.RollResults = {} end
+				
+				PSK.RollResults[player] = {
+					roll = tonumber(roll),
+					min = tonumber(low),
+					max = tonumber(high),
+					timestamp = GetTime()
+				}
+				print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", PSK.CapitalizeName(player), roll, low, high))
+			else
+				print(string.format("[PSK] Ignored roll from %s (not in raid)", PSK.CapitalizeName(player)))
+			end
 		end
 	end
+
 end)
 
 
-local rollFrame = CreateFrame("Frame")
-chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+-- local rollFrame = CreateFrame("Frame")
+-- chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 
-chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
-	-- Capture rolls during an active roll-off
-	if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
-		local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
-		if player and roll and low and high then
-			if not PSK.RollResults then PSK.RollResults = {} end
-			PSK.RollResults[player] = {
-				roll = tonumber(roll),
-				min = tonumber(low),
-				max = tonumber(high),
-				timestamp = GetTime()
-			}
-			print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
-		end
-	end
-end)
+-- chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
+	-- -- Capture rolls during an active roll-off
+	-- if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
+		-- local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
+		-- if player and roll and low and high then
+			-- if not PSK.RollResults then PSK.RollResults = {} end
+			-- PSK.RollResults[player] = {
+				-- roll = tonumber(roll),
+				-- min = tonumber(low),
+				-- max = tonumber(high),
+				-- timestamp = GetTime()
+			-- }
+			-- print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
+		-- end
+	-- end
+-- end)
 
 
 
@@ -849,13 +900,13 @@ end
     -- PSK:DebouncedRefreshPlayerLists()
 -- end
 
-------------------------------------------------
+----------------------------------------------
 -- Capitalize names that get added to the lists
-------------------------------------------------
+----------------------------------------------
 
--- function PSKCapitalizeName(name)
-    -- return name:sub(1, 1):upper() .. name:sub(2):lower()
--- end
+function PSK.CapitalizeName(name)
+    return name:sub(1, 1):upper() .. name:sub(2):lower()
+end
 
 ------------------------------------------
 -- Function add player from slash command

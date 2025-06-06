@@ -145,23 +145,28 @@ PSK.BidButton:SetSize(140, 30)
 PSK.BidButton:SetText("Start Bidding")
 PSK.BidButton.biddingActive = false
 
-PSK.BidButton:SetScript("OnClick", function(self)
-    self.biddingActive = not self.biddingActive
+
+PSK.BidButton:SetScript("OnClick", function()
+	if BiddingOpen then
+		PSK.BidButton.Border.Pulse:Stop()
+		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
+		PSK:CloseBidding()
+		PSK:CloseBidding(true)
 		
-	print("button clicked!")
-	
-    if self.biddingActive then
-		PlaySound(5275)
-		self:SetText("Close Bidding")
-		
-        -- Add logic for starting bidding phase here
-        PSK:Announce("[PSK] Bidding has begun! Whisper 'bid' to join.")
-    else
+		if PSK.Settings.buttonSoundsEnabled then
+			PlaySound(5275)
+		end
+
+	else
+		PSK.BidButton.Border:Show()
+		PSK.BidButton.Border.Pulse:Play()
+		PSK:StartBidding()
 		PlaySound(5274)
-        self:SetText("Start Bidding")
-        -- Add logic for closing bidding here
-        PSK:Announce("[PSK] Bidding has ended.")
-    end
+		if PSK.Settings.buttonSoundsEnabled then
+			PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
+		end
+
+	end
 end)
 
 ------------------------------
@@ -209,32 +214,6 @@ PSK.BidButton:SetText("Start Bidding")
 if not BiddingOpen then
     PSK.BidButton:Disable()
 end
-
------------------------------------------
--- Set script on button, bidding effects
------------------------------------------
-
-PSK.BidButton:SetScript("OnClick", function()
-	if BiddingOpen then
-		PSK.BidButton.Border.Pulse:Stop()
-		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
-		PSK:CloseBidding()
-
-		if PSK.Settings.buttonSoundsEnabled then
-			PlaySound(5275)
-		end
-
-	else
-		PSK.BidButton.Border:Show()
-		PSK.BidButton.Border.Pulse:Play()
-		PSK:StartBidding()
-		PlaySound(5274)
-		if PSK.Settings.buttonSoundsEnabled then
-			PlaySoundFile("Interface\\AddOns\\PSK\\media\\GoblinMaleZanyNPCGreeting01.ogg", "Master")
-		end
-
-	end
-end)
 
 
 ---------------------------------------------

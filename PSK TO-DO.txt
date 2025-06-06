@@ -1,4 +1,4 @@
 - Assigning loot to a player always says "Taurbucks" was assigned the loot.  
 - Import/Export Per-list
-- Player statuses in each list aren't refreshing on events (guild member login, logoff, etc).
+
 
