@@ -2,9 +2,17 @@
 
 Perchance PSK Addon.
 
-This addon will track a Main and Tier list for KSK loot distribution standings.
+This addon tracks a "Main" and "Tier" list for KSK loot distribution standings.
 
 Features:
+- Manage Tab
+- - Two lists display here:
+  - - "Available Main" is a list of max-level guild members who are *not* currently in the Main PSK list.
+  - - "Available Tier" is a list of max-level guild members who are *not* currently in the Tier PSK list.
+    - To add a player to either the Main or Tier PSK list, simply click the + icon to the left of their name.
+    - A slight delay is added to prevent issues when the + button is clicked repeatedly.
+
+
 - Main addon used by the raid Loot Master (required, for now).
   - Convenient minimap button of my dog, Mimic, opens/closes the addon.
 - KSK Main and Tier list are viewable in the left scroll list.
