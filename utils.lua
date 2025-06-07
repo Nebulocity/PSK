@@ -223,7 +223,7 @@ function PerformAward(index)
 		end
 	end
 
-	-- removeItemFromList(PSKDB.LootDrops)
+	removeItemFromList(PSKDB.LootDrops)
 
 
     if PSK.RefreshLogList then

@@ -1,4 +1,3 @@
-- Assigning loot to a player always says "Taurbucks" was assigned the loot.  
-- Import/Export Per-list
--- Uncomming this line from Utils.lua:  removeItemFromList(PSKDB.LootDrops)
+
+
 
