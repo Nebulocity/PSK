@@ -35,7 +35,7 @@ Features:
             - The awarded player then gets moved to the bottom of the PSK list.
         - The Bids list is cleared, and the Loot Drop being bid on is removed from the Loot Drops list.
 
-<img width="894" alt="Main" src="https://github.com/user-attachments/assets/21098707-2b82-40b4-a213-e8f11782fbf9" />
+<img width="895" alt="Manage_Tab" src="https://github.com/user-attachments/assets/e5e510a2-c6ac-43d1-9629-fc939785cee3" />
 
 - "Manage" Tab:
   - Two lists display here:
