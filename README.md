@@ -1,7 +1,9 @@
 
 Perchance PSK Addon.
 
-This addon tracks a "Main" and "Tier" list for KSK loot distribution standings.  An instructional video can be seen here: https://youtu.be/l_ZgQ-IcoAU
+This addon tracks a "Main" and "Tier" list for KSK loot distribution standings.  
+
+An instructional video can be seen here: https://youtu.be/l_ZgQ-IcoAU
 
 Features:
 
