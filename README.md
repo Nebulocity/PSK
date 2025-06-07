@@ -45,7 +45,7 @@ Features:
       - A slight delay is added to prevent issues when the + button is clicked repeatedly.
       - The player will be added to the bottom of the selected list.
 
-<img width="894" alt="Main" src="https://github.com/user-attachments/assets/fca79556-c28b-40bb-bc7b-2de13708d5c4" />
+<img width="897" alt="Loot" src="https://github.com/user-attachments/assets/5ecdbfb8-5f2b-4337-89f6-dc1aaf838c04" />
 
 - "Logs" tab:
   - This tab will display the player, their class, the loot they received, and the date and time they received it. 
