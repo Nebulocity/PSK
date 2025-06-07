@@ -73,7 +73,7 @@ end)
 -- Move Down Button
 PSK.MoveDownButton = CreateFrame("Button", nil, PSK.ContentFrame, "UIPanelButtonTemplate")
 PSK.MoveDownButton:SetSize(32, 24)
-PSK.MoveDownButton:SetPoint("LEFT", PSK.Headers.Main, "RIGHT", 60, 0)
+PSK.MoveDownButton:SetPoint("LEFT", PSK.Headers.Main, "RIGHT", 50, 0)
 PSK.MoveDownButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
 PSK.MoveDownButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
 PSK.MoveDownButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
@@ -98,13 +98,76 @@ PSK.MoveDownButton:SetScript("OnClick", function()
 end)
 
 
+-- Delete Button
+PSK.DeleteButton = CreateFrame("Button", nil, PSK.ContentFrame, "UIPanelButtonTemplate")
+PSK.DeleteButton:SetSize(32, 24)
+PSK.DeleteButton:SetPoint("LEFT", PSK.Headers.Main, "RIGHT", 85, 0)
+PSK.DeleteButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+PSK.DeleteButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+PSK.DeleteButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+PSK.DeleteButton:Hide()
+PSK.DeleteButton:SetScript("OnClick", function()
+    local listName = (PSK.CurrentList == "Tier") and "Tier" or "Main"
+    local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
+
+    if not list or not PSK.SelectedPlayer then return end
+
+    -- Store temporary data globally for use in StaticPopup
+    PSK.PendingDeleteData = {
+        name = PSK.SelectedPlayer,
+        list = list,
+    }
+
+    StaticPopup_Show("PSK_CONFIRM_DELETE_PLAYER", PSK.SelectedPlayer, listName)
+    PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+end)
+
+
+	
+----------------------------------
+-- Hide list buttons on Start
+----------------------------------
+
+PSK.MoveUpButton:Hide()
+PSK.MoveDownButton:Hide()
+PSK.DeleteButton:Hide()
+
+
+StaticPopupDialogs["PSK_CONFIRM_DELETE_PLAYER"] = {
+    text = "Remove %s from the %s list?",
+    button1 = "Yes",
+    button2 = "Cancel",
+    OnAccept = function()
+        local data = PSK.PendingDeleteData
+        if not data or not data.list or not data.name then return end
+
+        local list = data.list
+        local playerName = data.name
+
+        for i = #list, 1, -1 do
+            if list[i].name == playerName then
+                table.remove(list, i)
+                PSK.SelectedPlayer = nil
+                PSK:RefreshPlayerLists()
+                break
+            end
+        end
+
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3
+}
+
 
 ------------------------------
 -- Button to clear loot drops
 ------------------------------
 
 PSK.ClearLootButton = CreateFrame("Button", nil, PSK.ContentFrame, "GameMenuButtonTemplate")
-PSK.ClearLootButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 145, 0)
+PSK.ClearLootButton:SetPoint("RIGHT", PSK.Headers.Loot, "RIGHT", 115, 0)
 PSK.ClearLootButton:SetSize(60, -20)
 PSK.ClearLootButton:SetText("Clear")
 
@@ -127,13 +190,13 @@ end)
 -- Display Rarity
 ------------------------------
 
-PSK.LootLabel = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-PSK.LootLabel:SetPoint("RIGHT", PSK.ClearLootButton, "LEFT", -5, -1)
-local threshold = PSK.Settings.lootThreshold or 3
-local color = PSK.RarityColors[threshold] or "ffffff"
-local name = PSK.RarityNames[threshold] or "Rare"
+-- PSK.LootLabel = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+-- PSK.LootLabel:SetPoint("RIGHT", PSK.ClearLootButton, "LEFT", -5, -1)
+-- local threshold = PSK.Settings.lootThreshold or 3
+-- local color = PSK.RarityColors[threshold] or "ffffff"
+-- local name = PSK.RarityNames[threshold] or "Rare"
 
-PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
+-- PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
 
 
 ------------------------------
@@ -147,7 +210,7 @@ PSK.BidButton.biddingActive = false
 
 
 PSK.BidButton:SetScript("OnClick", function()
-	if BiddingOpen then
+	if PSK.BiddingOpen then
 		PSK.BidButton.Border.Pulse:Stop()
 		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
 		PSK:CloseBidding()
@@ -211,7 +274,7 @@ PSK.BidButton:SetPoint("LEFT", PSK.ToggleListButton, "RIGHT", 10, 0)
 PSK.BidButton:SetSize(160, 30)
 PSK.BidButton:SetText("Start Bidding")
 
-if not BiddingOpen then
+if not PSK.BiddingOpen then
     PSK.BidButton:Disable()
 end
 
@@ -253,6 +316,35 @@ importTierButton:SetScript("OnClick", function()
     local json = PSK.TierListEditBox:GetText()
     PSK:ImportPSKTierList(json)
 end)
+
+
+--------------------------------
+-- Import Main (Old Format)
+--------------------------------
+
+local importOldMainButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+importOldMainButton:SetSize(120, 30)
+importOldMainButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 30, 0)
+importOldMainButton:SetText("Import (Old)")
+importOldMainButton:SetScript("OnClick", function()
+	local text = PSK.MainListEditBox:GetText()
+	PSK:ImportOldPSKMainList(text)
+end)
+
+--------------------------------
+-- Import Tier (Old Format)
+--------------------------------
+
+local importOldTierButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+importOldTierButton:SetSize(120, 30)
+importOldTierButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -215, 0)
+importOldTierButton:SetText("Import (Old)")
+importOldTierButton:SetScript("OnClick", function()
+	local text = PSK.TierListEditBox:GetText()
+	PSK:ImportOldPSKTierList(text)
+end)
+
+
 
 
 

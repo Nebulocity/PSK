@@ -296,7 +296,7 @@ lootHeader:ClearAllPoints()
 lootHeader:SetPoint("TOPLEFT", lootScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Loot = lootHeader
 
-----------------------------------------------
+--------------------------------------------
 -- Parent Bidding scroll frame to ContentFrame
 ----------------------------------------------
 
@@ -322,12 +322,6 @@ tierHeader:SetPoint("TOPLEFT", 365, -10)
 -- Create the two scroll lists
 local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 2, manageTabScrollFrameHeight, "Available PSK Main Members")
 local tierScroll, tierChild, tierFrame, tierScrollHeader = CreateBorderedScrollFrame("PSKTierAvailableScroll", PSK.ManageFrame, 232, manageTabScrollFrameHeight, "Available PSK Tier Members")
-
--- Add Instructions Label to Manage Frame
--- local instructionsLabel = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
--- instructionsLabel:SetPoint("TOP", PSK.ManageFrame, "TOP", 0, -25)
--- instructionsLabel:SetText("Click the + sign to add a player to each respective list.")
--- instructionsLabel:SetTextColor(1, 0.85, 0.1)  -- Gold-like color
 
 -- Set headers for scroll lists
 mainScrollHeader:SetPoint("TOPLEFT", mainScroll, "TOPLEFT", 0, 20)
@@ -383,9 +377,6 @@ textRight:SetText(" to add a player to each respective list.")
 textRight:SetTextColor(1, 0.85, 0.1)
 
 
-
-
-
 ------------------------------------------------
 -- Dialog for clearing loot drops
 ------------------------------------------------
@@ -420,7 +411,7 @@ PSK.Headers.Logs = logHeader
 ------------------------------
 
 PSK.Tabs = {}
-PanelTemplates_SetNumTabs(PSK.MainFrame, 5)
+PanelTemplates_SetNumTabs(PSK.MainFrame, 4)
 
 ------------------------------
 -- Set Tab 1 (PSK)
@@ -433,6 +424,7 @@ tab1:SetPoint("BOTTOMLEFT", PSK.MainFrame, "BOTTOMLEFT", 10, -30)
 PanelTemplates_TabResize(tab1, 0)
 PSK.Tabs[1] = tab1
 
+
 ------------------------------
 -- Set Tab 2 (Manage)
 ------------------------------
@@ -444,89 +436,29 @@ tab2:SetPoint("LEFT", tab1, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab2, 0)
 PSK.Tabs[2] = tab2
 
+
 ------------------------------
--- Set Tab 3 (Settings)
+-- Set Tab 3 (Logs)
 ------------------------------
 
 local tab3 = CreateFrame("Button", "PSKMainFrameTab3", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab3:SetID(3)
-tab3:SetText("Settings")
+tab3:SetText("Logs")
 tab3:SetPoint("LEFT", tab2, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab3, 0)
 PSK.Tabs[3] = tab3
 
 ------------------------------
--- Set Tab 4 (Logs)
+-- Tab 4 (Import/Export)
 ------------------------------
 
 local tab4 = CreateFrame("Button", "PSKMainFrameTab4", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab4:SetID(4)
-tab4:SetText("Logs")
+tab4:SetText("Import/Export")
 tab4:SetPoint("LEFT", tab3, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab4, 0)
 PSK.Tabs[4] = tab4
 
-------------------------------
--- Tab 5 (Import/Export)
-------------------------------
-
-local tab5 = CreateFrame("Button", "PSKMainFrameTab5", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
-tab5:SetID(5)
-tab5:SetText("Import/Export")
-tab5:SetPoint("LEFT", tab4, "RIGHT", -16, 0)
-PanelTemplates_TabResize(tab5, 0)
-PSK.Tabs[5] = tab5
-
-------------------------------
--- Create Settings UI
-------------------------------
-
-local settingsTitle = PSK.SettingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-settingsTitle:SetPoint("TOP", 0, -40)
-settingsTitle:SetText("PSK Settings")
-
---------------------------------
--- Enable/Disable Sound Effects
---------------------------------
-
-local soundCheckbox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
-soundCheckbox:SetPoint("TOPLEFT", 20, -80) 
-soundCheckbox.Text:SetText("Button Sounds")
-soundCheckbox:SetChecked(PSK.Settings.buttonSoundsEnabled)
-
-soundCheckbox:SetScript("OnClick", function(self)
-    local enabled = self:GetChecked()
-    PSK.Settings.buttonSoundsEnabled = enabled
-
-    -- Ensure PSKDB.Settings exists before we update it
-    if not PSKDB then PSKDB = {} end
-    if not PSKDB.Settings then PSKDB.Settings = {} end
-    PSKDB.Settings.buttonSoundsEnabled = enabled
-
-    print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
-end)
-
-
---------------------------------
--- Enable/Disable Debugging
---------------------------------
-
-local debuggingCheckBox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
-debuggingCheckBox:SetPoint("TOPLEFT", 40, -80) 
-debuggingCheckBox.Text:SetText("Print Debug Text")
-debuggingCheckBox:SetChecked(PSK.Settings.debugEnabled)
-
-debuggingCheckBox:SetScript("OnClick", function(self)
-    local enabled = self:GetChecked()
-    PSK.Settings.buttonSoundsEnabled = enabled
-
-    -- Ensure PSKDB.Settings exists before we update it
-    if not PSKDB then PSKDB = {} end
-    if not PSKDB.Settings then PSKDB.Settings = {} end
-    PSKDB.Settings.debugEnabled = enabled
-
-    print("[PSK] Printing debug text " .. (enabled and "enabled." or "disabled."))
-end)
 
 
 ------------------------------
@@ -534,15 +466,23 @@ end)
 ------------------------------
 
 hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
-    local tabID = self:GetID()
-    PanelTemplates_SetTab(PSK.MainFrame, tabID)
 
-    -- Deselect all tabs
-    for _, tab in ipairs(PSK.Tabs) do
-        if tab:GetID() ~= tabID then
-            PanelTemplates_DeselectTab(tab)
-        end
+	-- Only respond to tab clicks that are children of PSKMainFrame
+    if not self or not self:GetParent() or self:GetParent():GetName() ~= "PSKMainFrame" then
+        return
     end
+	
+    local tabID = self:GetID()
+	
+    -- PanelTemplates_SetTab(PSK.MainFrame, tabID)
+	for i, tab in ipairs(PSK.Tabs) do
+		if i == tabID then
+			PanelTemplates_SelectTab(tab)
+		else
+			PanelTemplates_DeselectTab(tab)
+		end
+	end
+
 
     -- Hide all frames first
     PSK.ContentFrame:Hide()
@@ -558,10 +498,8 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
         PSK.ManageFrame:Show()
         PSK:DebouncedRefreshAvailablePlayerLists()
     elseif tabID == 3 then
-        PSK.SettingsFrame:Show()
-    elseif tabID == 4 then
         PSK.LogsFrame:Show()
-    elseif tabID == 5 then
+    elseif tabID == 4 then
         PSK.ImportExportFrame:Show()
     end
 end)
@@ -585,6 +523,7 @@ end)
         preferredIndex = 3,
     }
 	
+			
 	
 ----------------------------------
 -- Set the default selected tab
@@ -597,15 +536,6 @@ PSK.SettingsFrame:Hide()
 PSK.ManageFrame:Hide()
 PSK.LogsFrame:Hide()
 PSKImportExportFrame:Hide()
-
-
-
-
-
-
-
-
-
 
 
 ----------------------------------

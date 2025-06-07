@@ -119,7 +119,7 @@ function PerformAward(index)
             row.bg:SetColorTexture(0, 0, 0, 0)
             PSK.SelectedLootRow = nil
             PSK.SelectedItem = nil
-            if not BiddingOpen then
+            if not PSK.BiddingOpen then
                 PSK.BidButton:Disable()
             end
             PSK:DebouncedRefreshLootList()
@@ -129,7 +129,7 @@ function PerformAward(index)
     else
         PSK.SelectedLootRow = nil
         PSK.SelectedItem = nil
-        if not BiddingOpen then
+        if not PSK.BiddingOpen then
             PSK.BidButton:Disable()
         end
         PSK:DebouncedRefreshLootList()
@@ -137,13 +137,39 @@ function PerformAward(index)
 
 	-- Reorder standings based on current list and selected player
 	if PSK.SelectedPlayer then
-		PSK:Announce("PSK:ReorderListOnAward() called.")
 		PSK:ReorderListOnAward(PSK.CurrentList)
+		
+		-- Update dateLastRaided for all raid members in the Main or Tier list
+		local now = date("%m/%d/%Y")
+
+		local function updateRaidersDateLastRaided(list)
+			for _, entry in ipairs(list) do
+				for i = 1, MAX_RAID_MEMBERS do
+					local unit = "raid" .. i
+					if UnitExists(unit) then
+						local name = Ambiguate(UnitName(unit), "short")
+						if name == entry.name then
+							entry.dateLastRaided = now
+							break
+						end
+					end
+				end
+			end
+		end
+
+		if PSKDB.MainList then
+			updateRaidersDateLastRaided(PSKDB.MainList)
+		end
+		if PSKDB.TierList then
+			updateRaidersDateLastRaided(PSKDB.TierList)
+		end
+
 	else
 		print("[PSK] Error: No selected player found to reorder list.")
 	end
 
 	-- Clear bidders after awarding
+	PSK.BiddingOpen = false
 	PSK.BidEntries = {}
 	PSK:RefreshBidList()
 
@@ -157,36 +183,16 @@ function PerformAward(index)
 	local color = RAID_CLASS_COLORS[playerClass or "SHAMAN"] or { r = 1, g = 1, b = 1 }
 	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
 
-	-- Get item details
-	local itemLink = PSK.SelectedItem
-	local itemName = item.itemLink and GetItemInfo(item.itemLink) or "Unknown Item"
-
+	
+	-- Get item details before clearing selection
+	local itemLink = item.itemLink
+	local itemName = GetItemInfo(itemLink) or "Unknown Item"
 
 	if itemLink then 
 		PSK:Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
 	end
-	
-	-- Auto-award loot.
-	-- Only works with loot window open and player nearby.
 
-	-- local slotIndex = item.lootSlotIndex
-	-- local gaveLoot = false
 
-	-- if slotIndex then
-		-- for j = 1, GetNumGroupMembers() do
-			-- local candidateName = GetMasterLootCandidate(slotIndex, j)
-			-- if candidateName == PSK.SelectedPlayer then
-				-- GiveMasterLoot(slotIndex, j)
-				-- gaveLoot = true
-				-- PSK:Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
-				-- break
-			-- end
-		-- end
-	-- end
-
-	-- if not gaveLoot then
-		-- print("[PSK] Warning: Could not assign loot automatically. Please assign", itemLink, "to", playerName, "manually.")
-	-- end
 
     -- Log the award
     PSKDB.LootLogs = PSKDB.LootLogs or {}
@@ -217,7 +223,7 @@ function PerformAward(index)
 		end
 	end
 
-	removeItemFromList(PSKDB.LootDrops)
+	-- removeItemFromList(PSKDB.LootDrops)
 
 
     if PSK.RefreshLogList then
@@ -255,10 +261,11 @@ function PSK:ReorderListOnAward(listName)
         return
     end
 
-    local shortAwarded = Ambiguate(awarded, "short")
+    local shortAwarded = PSK.CapitalizeName(Ambiguate(awarded, "short"))
 
 	-- Remove awarded player from the list (match by name)
     local awardedEntry
+
     for i = #list, 1, -1 do
         local entry = list[i]
         if type(entry) == "table" and entry.name and Ambiguate(entry.name, "short") == shortAwarded then
@@ -266,7 +273,7 @@ function PSK:ReorderListOnAward(listName)
             break
         end
     end
-
+	
 	-- Re-insert at the bottom
     table.insert(list, awardedEntry)
 	
@@ -333,16 +340,16 @@ function PSK:ReorderListOnAward(listName)
         end
     end
 
-    -- 📢 Announce movements
-    PSK:Announce("---- [PSK] List Reordered ----")
-    if #diff == 0 then
-        PSK:Announce("No players moved.")
-    else
-        for _, entry in ipairs(diff) do
-            PSK:Announce(string.format("%s (%s) moved from %d to %d", entry.name, entry.status, entry.from, entry.to))
-        end
-    end
-    PSK:Announce(string.format("%s was awarded and moved to the bottom.", shortAwarded))
+    -- DEBUG: Announce movements
+    -- PSK:Announce("---- [PSK] List Reordered ----")
+    -- if #diff == 0 then
+        -- PSK:Announce("No players moved.")
+    -- else
+        -- for _, entry in ipairs(diff) do
+            -- PSK:Announce(string.format("%s (%s) moved from %d to %d", entry.name, entry.status, entry.from, entry.to))
+        -- end
+    -- end
+    -- PSK:Announce(string.format("%s was awarded and moved to the bottom.", shortAwarded))
 end
 
 
@@ -513,13 +520,9 @@ end
 
 function PSK:RefreshLootList()
 
-    if not PSKDB.LootDrops then return end
+	if not PSKDB or not PSKDB.LootDrops then return end
 
-	if not PSKDB or not PSKDB.LootDrops or #PSKDB.LootDrops == 0 then	
-		print("No loot drops recorded")
-		return
-	end
-	
+
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
     if not scrollChild or not header then return end
@@ -615,8 +618,7 @@ function PSK:RefreshLootList()
         if pool[i] then pool[i]:Hide() end
     end
 
-
-    header:SetText("Loot Drops")
+    header:SetText("Loot Drops (" .. #PSKDB.LootDrops .. ")")
 
     -- PSK:BroadcastUpdate("RefreshLootList")
 end
@@ -972,12 +974,14 @@ function PSK:RefreshPlayerLists()
 				PSK.SelectedPlayerRow = nil
 				PSK.MoveUpButton:Hide()
 				PSK.MoveDownButton:Hide()
+				PSK.DeleteButton:Hide()
 			else
 				-- Select
 				PSK.SelectedPlayer = name
 				PSK.SelectedPlayerRow = index
 				PSK.MoveUpButton:Show()
 				PSK.MoveDownButton:Show()
+				PSK.DeleteButton:Show()
 			end
 
 			PSK:RefreshPlayerLists()
