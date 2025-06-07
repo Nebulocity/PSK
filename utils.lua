@@ -37,6 +37,8 @@ CLASS_NAME_TO_FILE = {
     ["Druid"]   = "DRUID",
 }
 
+-- DO NOT OVERWRITE 'RAID_CLASS_COLORS'!!!
+-- It will break other addons...
 local CLASS_COLORS = RAID_CLASS_COLORS or {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
     PALADIN = { r = 0.96, g = 0.55, b = 0.73 },
@@ -54,9 +56,10 @@ local CLASS_COLORS = RAID_CLASS_COLORS or {
 -- Award loot to selected player
 ---------------------------------
 
-function AwardPlayer(index)
+function PSK:AwardPlayer(index)
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
+	
     if not playerName then
         print("AwardPlayer: No playerName found at index", index)
         return
@@ -86,15 +89,17 @@ end
 ---------------------------------
 
 function PerformAward(index)
+
     local playerEntry = PSK.BidEntries and PSK.BidEntries[index]
     local playerName = playerEntry and playerEntry.name
+	PSK.SelectedPlayer = playerName
     local playerClass = playerEntry and playerEntry.class
     local list = (PSK.CurrentList == "Main") and PSKDB.MainList or PSKDB.TierList
     
 	-- Use the selected item instead of relying on index
 	local item = PSK.SelectedItemData
 
-	-- Defensive fallback
+	-- In case an item wasn't selected for award, or it became deselected
 	if not item then
 		print("[PSK] Error: No selected item found for award")
 		return
@@ -114,7 +119,7 @@ function PerformAward(index)
             row.bg:SetColorTexture(0, 0, 0, 0)
             PSK.SelectedLootRow = nil
             PSK.SelectedItem = nil
-            if not BiddingOpen then
+            if not PSK.BiddingOpen then
                 PSK.BidButton:Disable()
             end
             PSK:DebouncedRefreshLootList()
@@ -124,71 +129,338 @@ function PerformAward(index)
     else
         PSK.SelectedLootRow = nil
         PSK.SelectedItem = nil
-        if not BiddingOpen then
+        if not PSK.BiddingOpen then
             PSK.BidButton:Disable()
         end
         PSK:DebouncedRefreshLootList()
     end
 
-    -- Remove from bids
-    table.remove(PSK.BidEntries, index)
+	-- Reorder standings based on current list and selected player
+	if PSK.SelectedPlayer then
+		PSK:ReorderListOnAward(PSK.CurrentList)
+		
+		-- Update dateLastRaided for all raid members in the Main or Tier list
+		local now = date("%m/%d/%Y")
 
-    -- Move awarded player to end of list
-    for i = #list, 1, -1 do
-        if list[i]:lower() == playerName:lower() then
-            table.remove(list, i)
-            break
-        end
-    end
-	
-    table.insert(list, playerName)
+		local function updateRaidersDateLastRaided(list)
+			for _, entry in ipairs(list) do
+				for i = 1, MAX_RAID_MEMBERS do
+					local unit = "raid" .. i
+					if UnitExists(unit) then
+						local name = Ambiguate(UnitName(unit), "short")
+						if name == entry.name then
+							entry.dateLastRaided = now
+							break
+						end
+					end
+				end
+			end
+		end
+
+		if PSKDB.MainList then
+			updateRaidersDateLastRaided(PSKDB.MainList)
+		end
+		if PSKDB.TierList then
+			updateRaidersDateLastRaided(PSKDB.TierList)
+		end
+
+	else
+		print("[PSK] Error: No selected player found to reorder list.")
+	end
+
+	-- Clear bidders after awarding
+	PSK.BiddingOpen = false
+	PSK.BidEntries = {}
+	PSK:RefreshBidList()
+
+	-- Clear selection
+	PSK.SelectedItem = nil
+	PSK.SelectedItemData = nil
+	PSK.SelectedLootRow = nil
+
 
 	-- Get class color
 	local color = RAID_CLASS_COLORS[playerClass or "SHAMAN"] or { r = 1, g = 1, b = 1 }
 	local coloredName = string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, playerName)
 
-	local itemLink = PSK.SelectedItem
-	local itemName = GetItemInfo(itemLink) or itemLink
-	Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+	
+	-- Get item details before clearing selection
+	local itemLink = item.itemLink
+	local itemName = GetItemInfo(itemLink) or "Unknown Item"
+
+	if itemLink then 
+		PSK:Announce("[PSK] " .. itemLink .. " awarded to " .. playerName)
+	end
+
+
 
     -- Log the award
-    table.insert(PSKDB.LootLogs, {
-        player = playerName,
-        class = playerClass or "PRIEST",
-        itemLink = item.itemLink,
-        itemTexture = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark",
-        timestamp = date("%I:%M%p %m/%d/%Y"),
-    })
+    PSKDB.LootLogs = PSKDB.LootLogs or {}
+
+	table.insert(PSKDB.LootLogs, {
+		player = playerName,
+		class = playerClass or "SHAMAN",
+		itemLink = item.itemLink,
+		itemTexture = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark",
+		timestamp = date("%I:%M%p %m/%d/%Y"),
+	})
+
 
     -- Remove from visible + persistent loot lists
-    table.remove(PSK.LootDrops, index)
-    table.remove(PSKGlobal.LootDrops, index)
+    local itemLinkToRemove = item.itemLink
+	local textureToRemove = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark"
+	local timestampToRemove = item.timestamp
+	
+	local function removeItemFromList(list)
+		for i = #list, 1, -1 do
+			local entry = list[i]
+
+			if entry.itemLink == itemLinkToRemove and entry.timestamp == timestampToRemove then
+				print(">>> Match found — removing loot entry.")
+				table.remove(list, i)
+				break
+			end
+		end
+	end
+
+	removeItemFromList(PSKDB.LootDrops)
+
 
     if PSK.RefreshLogList then
         PSK:DebouncedRefreshLogList()
     end
 
-    PSK:DebouncedRefreshPlayerList()
-    PSK:DebouncedRefreshBidList()
+    PSK:RefreshPlayerLists()
+    PSK:RefreshBidList()
     PlaySound(12867)
 end
 
 
+-----------------------------------------------------------
+-- Adjust standings when a player is awarded:
+-- 	Non-raid member standings are frozen
+-- 	Raid member standings move around them
+-- 	In the event of a tie, non-Raid goes 1 position lower
+-----------------------------------------------------------
 
----------------------------------
--- Pass on current player
----------------------------------
+function PSK:ReorderListOnAward(listName)
+    if not listName or (listName ~= "Main" and listName ~= "Tier") then
+        PSK:Announce("[PSK] Invalid list name: " .. tostring(listName))
+        return
+    end
 
-function PassPlayer()
-    -- Nothing needed here -- selection will be cleared in the UI
+    local list = (listName == "Main") and PSKDB.MainList or PSKDB.TierList
+    if not list or type(list) ~= "table" then
+        PSK:Announce("[PSK] List not found or invalid: " .. tostring(listName))
+        return
+    end
+
+    local awarded = PSK.SelectedPlayer
+    if not awarded then
+        PSK:Announce("[PSK] No player selected for awarding.")
+        return
+    end
+
+    local shortAwarded = PSK.CapitalizeName(Ambiguate(awarded, "short"))
+
+	-- Remove awarded player from the list (match by name)
+    local awardedEntry
+
+    for i = #list, 1, -1 do
+        local entry = list[i]
+        if type(entry) == "table" and entry.name and Ambiguate(entry.name, "short") == shortAwarded then
+            awardedEntry = table.remove(list, i)
+            break
+        end
+    end
+	
+	-- Re-insert at the bottom
+    table.insert(list, awardedEntry)
+	
+    -- Track original positions
+    local originalIndex = {}
+    for i, entry in ipairs(list) do
+        if type(entry) == "table" and entry.name then
+            originalIndex[Ambiguate(entry.name, "short")] = i
+        else
+            PSK:Announce(string.format("[PSK] Skipping invalid entry at index %d: %s", i, tostring(entry)))
+        end
+    end
+
+    if not awardedEntry then
+        PSK:Announce("[PSK] Could not find awarded player in list: " .. shortAwarded)
+        return
+    end  
+
+    -- Build raid lookup
+    local raidLookup = {}
+    for i = 1, GetNumGroupMembers() do
+        local name = GetRaidRosterInfo(i)
+        if name then
+            raidLookup[Ambiguate(name, "short")] = true
+        end
+    end
+
+    -- Bubble raid members over non-raid members (except awarded at bottom)
+    for i = #list - 1, 2, -1 do
+        local curr = list[i]
+        local prev = list[i - 1]
+        if curr and prev and curr.name and prev.name then
+            local sc = Ambiguate(curr.name, "short")
+            local sp = Ambiguate(prev.name, "short")
+            if raidLookup[sc] and not raidLookup[sp] then
+                list[i], list[i - 1] = list[i - 1], list[i]
+            end
+        end
+    end
+
+    -- Edge case for first two entries
+    if #list >= 2 and list[1] and list[2] and list[1].name and list[2].name then
+        local s1 = Ambiguate(list[1].name, "short")
+        local s2 = Ambiguate(list[2].name, "short")
+        if raidLookup[s2] and not raidLookup[s1] then
+            list[1], list[2] = list[2], list[1]
+        end
+    end
+
+    -- Build diff
+    local diff = {}
+    for i, entry in ipairs(list) do
+        if type(entry) == "table" and entry.name then
+            local shortName = Ambiguate(entry.name, "short")
+            local from = originalIndex[shortName]
+            if from and from ~= i then
+                table.insert(diff, {
+                    name = shortName,
+                    from = from,
+                    to = i,
+                    status = raidLookup[shortName] and "Raid" or "Non-Raid"
+                })
+            end
+        end
+    end
+
+    -- DEBUG: Announce movements
+    -- PSK:Announce("---- [PSK] List Reordered ----")
+    -- if #diff == 0 then
+        -- PSK:Announce("No players moved.")
+    -- else
+        -- for _, entry in ipairs(diff) do
+            -- PSK:Announce(string.format("%s (%s) moved from %d to %d", entry.name, entry.status, entry.from, entry.to))
+        -- end
+    -- end
+    -- PSK:Announce(string.format("%s was awarded and moved to the bottom.", shortAwarded))
 end
+
+
+
+
+function PSK:SafeAmbiguate(name)
+    return name and Ambiguate(name, "short") or ""
+end
+
+
+
+-- function PSK:ReorderListOnAward(listName, awardedPlayer)
+    -- local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
+    -- if not list then return end
+
+	-- print("Reordering %s list after awarding to: %s", listName, awardedPlayer)
+	
+    -- -- Get a lookup of all raid members
+    -- local raidRoster = {}
+    -- for i = 1, GetNumGroupMembers() do
+        -- local name = GetRaidRosterInfo(i)
+        -- if name then
+            -- local baseName = Ambiguate(name, "short")
+            -- raidRoster[baseName] = true
+        -- end
+    -- end
+
+    -- -- Build categorized lists
+    -- local inRaid = {}
+    -- local notInRaid = {}
+
+    -- -- Preserve order while separating raid members and non-raid
+    -- for i = 1, #list do
+        -- local name = list[i]
+        -- if name == awardedPlayer then
+            -- -- Skip for now (we’ll reinsert them)
+			-- print("Skipping awarded player: %s", name)
+        -- elseif raidRoster[name] then
+			-- -- If they're in the raid (raidRoster[name] = true
+            -- table.insert(inRaid, name)
+			-- print("In-raid member kept: %s", name)
+        -- else
+			-- -- If they're not in the raid (raidRoster[name] = false
+            -- table.insert(notInRaid, name)
+			-- print("Non-raid member preserved: %s", name)
+        -- end
+    -- end
+
+    -- -- Add awarded player to bottom of inRaid list
+    -- table.insert(inRaid, awardedPlayer)
+	-- print("Awarded player added to bottom of raid list: %s", awardedPlayer)
+	
+	
+    -- -- Merge back: interweave non-raiders into their original positions
+    -- local newList = {}
+    -- local raidIndex, nonRaidIndex = 1, 1
+    -- for i = 1, #list do
+        -- local expectedName = list[i]
+        -- local isInRaid = raidRoster[expectedName]
+        -- local nextRaid = inRaid[raidIndex]
+        -- local nextNonRaid = notInRaid[nonRaidIndex]
+
+        -- if not isInRaid and nextNonRaid == expectedName then
+            -- table.insert(newList, nextNonRaid)
+			-- print("Added non-raid: %s", nextNonRaid)
+            -- nonRaidIndex = nonRaidIndex + 1
+        -- elseif isInRaid and nextRaid then
+            -- table.insert(newList, nextRaid)
+			-- print("Added raid member: %s", nextRaid)
+            -- raidIndex = raidIndex + 1
+        -- elseif nextNonRaid then
+            -- -- Tie breaker: non-raid loses
+            -- table.insert(newList, nextNonRaid)
+			-- print("Added raid member: %s", nextRaid)
+            -- nonRaidIndex = nonRaidIndex + 1
+        -- end
+    -- end
+
+    -- -- Fallback in case of mismatch
+    -- while raidIndex <= #inRaid do
+        -- table.insert(newList, inRaid[raidIndex])
+		-- print("Added remaining raid member: %s", inRaid[raidIndex])
+        -- raidIndex = raidIndex + 1
+    -- end
+	
+    -- while nonRaidIndex <= #notInRaid do
+        -- table.insert(newList, notInRaid[nonRaidIndex])
+		-- print("Added remaining non-raid: %s", notInRaid[nonRaidIndex])
+        -- nonRaidIndex = nonRaidIndex + 1
+    -- end
+
+	-- print("New %s list order:", listName)
+    -- for i, name in ipairs(newList) do
+        -- print("  %d. %s", i, name)
+    -- end
+	
+    -- -- Save result
+    -- if listName == "Tier" then
+        -- PSKDB.TierList = newList
+    -- else
+        -- PSKDB.MainList = newList
+    -- end
+	
+-- end
 
 
 ----------------------------------------------
 -- Announce to party/raid 
 ----------------------------------------------
 
-function Announce(message)
+function PSK:Announce(message)
     local playerName = UnitName("player")
 
     if IsInRaid() then
@@ -247,7 +519,9 @@ end
 ----------------------------------------
 
 function PSK:RefreshLootList()
-    if not PSKDB.LootLogs then return end
+
+	if not PSKDB or not PSKDB.LootDrops then return end
+
 
     local scrollChild = PSK.ScrollChildren.Loot
     local header = PSK.Headers.Loot
@@ -259,37 +533,13 @@ function PSK:RefreshLootList()
         child:SetParent(nil)
     end
 
-    if PSK.RecordingWarningDrops then
-        if not PSK.LootRecordingActive then
-            PSK.RecordingWarningDrops:Show()
-            if not PSK.RecordingWarningDrops.pulse:IsPlaying() then
-                PSK.RecordingWarningDrops.pulse:Play()
-            end
-        else
-            PSK.RecordingWarningDrops:Hide()
-            PSK.RecordingWarningDrops.pulse:Stop()
-        end
-    end
-
-    if PSK.RecordingWarningLogs then
-        if not PSK.LootRecordingActive then
-            PSK.RecordingWarningLogs:Show()
-            if not PSK.RecordingWarningLogs.pulse:IsPlaying() then
-                PSK.RecordingWarningLogs.pulse:Play()
-            end
-        else
-            PSK.RecordingWarningLogs:Hide()
-            PSK.RecordingWarningLogs.pulse:Stop()
-        end
-    end
-
     PSK.RowPool = PSK.RowPool or {}
     PSK.RowPool[scrollChild] = PSK.RowPool[scrollChild] or {}
     local pool = PSK.RowPool[scrollChild]
 
     local yOffset = -5
 
-    for index, loot in ipairs(PSKGlobal.LootDrops) do
+    for index, loot in ipairs(PSKDB.LootDrops) do
         local row = pool[index]
         if not row then
             row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
@@ -335,7 +585,6 @@ function PSK:RefreshLootList()
                 PSK.SelectedItem = row.itemLink
                 PSK.SelectedItemData = row.lootData
                 PSK.BidButton:Enable()
-                print("[PSK] Selected item for bidding: " .. row.itemLink)
 
                 local pulse = row:CreateAnimationGroup()
                 local fadeOut = pulse:CreateAnimation("Alpha")
@@ -365,21 +614,32 @@ function PSK:RefreshLootList()
     end
 
     -- Hide unused rows
-    for i = #PSKGlobal.LootDrops + 1, #pool do
+    for i = #PSKDB.LootDrops + 1, #pool do
         if pool[i] then pool[i]:Hide() end
     end
 
-    local threshold = PSK.Settings.lootThreshold or 3
-    local rarityNames = {
-        [0] = "Poor", [1] = "Common", [2] = "Uncommon",
-        [3] = "Rare", [4] = "Epic", [5] = "Legendary"
-    }
-    local rarityName = rarityNames[threshold] or "?"
-    -- header:SetText("Loot Drops (" .. #PSKGlobal.LootDrops .. ") " .. rarityName .. "+")
-    header:SetText("Loot Drops")
+    header:SetText("Loot Drops (" .. #PSKDB.LootDrops .. ")")
 
     -- PSK:BroadcastUpdate("RefreshLootList")
 end
+
+
+----------------------------------------
+-- Helper function for looting
+----------------------------------------
+
+function PSK:IsLootAlreadyRecorded(itemLink)
+    for _, entry in ipairs(PSKDB.LootDrops or {}) do
+        if entry.itemLink == itemLink then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+
 
 
 ----------------------------------------
@@ -528,7 +788,7 @@ end
 -- Refresh Player List (for Main or Tier)
 ----------------------------------------
 
-function PSK:RefreshPlayerList()
+function PSK:RefreshPlayerLists()
 
 	if InCombatLockdown() then
 		if PSK.EventFrame and PSK.EventFrame.RegisterEvent then
@@ -537,12 +797,7 @@ function PSK:RefreshPlayerList()
 		return
 	end
 
-	
     if not PSKDB or not PSK.CurrentList then return end
-	
-	-- Ensure the player data is up to date
-	PSK:UpdatePlayerData()
-
 
     local scrollChild = PSK.ScrollChildren.Main
     local header = PSK.Headers.Main
@@ -565,7 +820,9 @@ function PSK:RefreshPlayerList()
     header:SetText((PSK.CurrentList == "Main" and "PSK Main" or "PSK Tier") .. " (" .. #names .. ")")
 
     local yOffset = -5
-    for index, name in ipairs(names) do
+    for index, entry in ipairs(names) do
+		local name = entry.name
+		local storedDate = entry.dateLastRaided or "Never"
 
 		local row = PSK:GetOrCreateRow(index, scrollChild, "Player")
 		
@@ -582,24 +839,66 @@ function PSK:RefreshPlayerList()
 			row.bg:SetColorTexture(0, 0.5, 1, 0.15)  -- Light blue for selection
 		end
 		
-		row.bg:Hide()		
+		-- row.bg:Hide()		
+
 		
-        -- Pull real player info
-        local playerData = PSKDB.Players and PSKDB.Players[name]
-        local class = (playerData and playerData.class) or "SHAMAN"
-        local online = (playerData and playerData.online) or false
-        local inRaid = (playerData and playerData.inRaid) or false
-        local level = (playerData and playerData.level) or "???"
-        local zone = (playerData and playerData.zone) or "???"
+		
+        -- Get live data from raid/group/guild APIs
+		local class, level, zone, online, inRaid = "SHAMAN", "???", "???", false, false
+
+		-- Try raid/group info first
+		if IsInRaid() then
+			for i = 1, MAX_RAID_MEMBERS do
+				local unit = "raid" .. i
+				if UnitExists(unit) and Ambiguate(UnitName(unit), "short") == name then
+					local _, classToken = UnitClass(unit)
+					class = classToken or class
+					level = UnitLevel(unit) or level
+					zone = GetZoneText()
+					online = UnitIsConnected(unit)
+					inRaid = true
+					break
+				end
+			end
+		elseif IsInGroup() then
+			for i = 1, GetNumGroupMembers() - 1 do
+				local unit = "party" .. i
+				if UnitExists(unit) and Ambiguate(UnitName(unit), "short") == name then
+					local _, classToken = UnitClass(unit)
+					class = classToken or class
+					level = UnitLevel(unit) or level
+					zone = GetZoneText()
+					online = UnitIsConnected(unit)
+					inRaid = false
+					break
+				end
+			end
+		end
+
+		-- Fallback to Guild Roster
+		if class == "SHAMAN" and GetNumGuildMembers() > 0 then
+			for i = 1, GetNumGuildMembers() do
+				local gName, _, _, gLevel, _, gZone, _, _, gOnline, _, gClassFile = GetGuildRosterInfo(i)
+				local gShortName = Ambiguate(gName or "", "short")
+				if gShortName == name then
+					class = gClassFile or class
+					level = gLevel or level
+					zone = gZone or zone
+					online = gOnline or false
+					break
+				end
+			end
+		end
 
         row.playerData = {
-            class = class,
-            online = online,
-            inRaid = inRaid,
-            name = name,
-            level = playerData and playerData.level or "???",
-			zone = playerData and playerData.zone or "???"
-        }
+			name = name,
+			class = class,
+			online = online,
+			inRaid = inRaid,
+			level = level,
+			zone = zone,
+			dateLastRaided = storedDate
+		}
 
         -- Position
 		if not row.posText then
@@ -626,8 +925,8 @@ function PSK:RefreshPlayerList()
 		
 		-- Extract the player class
 		local playerClass = playerData and playerData.class or "SHAMAN"
-		local fileClass = string.upper(playerClass)
-
+		local fileClass = string.upper(row.playerData.class or "SHAMAN")
+		
 		-- Corrected class color lookup
 		local classColor = RAID_CLASS_COLORS[fileClass] or { r = 1, g = 1, b = 1 }
 
@@ -636,7 +935,8 @@ function PSK:RefreshPlayerList()
 			row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 			row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 8, 0)
 		end
-		row.nameText:SetText(name)
+		
+		row.nameText:SetText(row.playerData.name)
 		row.nameText:SetTextColor(classColor.r, classColor.g, classColor.b)
 
 		-- Status
@@ -665,97 +965,64 @@ function PSK:RefreshPlayerList()
 			row.classIcon:SetAlpha(0.5)
 		end
 		
-        -- Click to select row
+	
+		-- Click to select row
         row:SetScript("OnClick", function()
-            PSK.SelectedPlayerRow = index
-            PSK.SelectedPlayer = name
-            PSK:DebouncedRefreshPlayerList()
-        end)
+			if PSK.SelectedPlayer == name then
+				-- Deselect
+				PSK.SelectedPlayer = nil
+				PSK.SelectedPlayerRow = nil
+				PSK.MoveUpButton:Hide()
+				PSK.MoveDownButton:Hide()
+				PSK.DeleteButton:Hide()
+			else
+				-- Select
+				PSK.SelectedPlayer = name
+				PSK.SelectedPlayerRow = index
+				PSK.MoveUpButton:Show()
+				PSK.MoveDownButton:Show()
+				PSK.DeleteButton:Show()
+			end
 
+			PSK:RefreshPlayerLists()
+
+		end)
+
+
+	
         -- Highlight the selected row
         if PSK.SelectedPlayer == name then
-            row.bg:Show()
-
-            -- Add Up Arrow with Flash Animation
-			local upButton = CreateFrame("Button", nil, row)
-			upButton:SetSize(24, 24)
-			upButton:SetPoint("RIGHT", row, "RIGHT", -20, 0)
-			upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-			upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
-			upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
-
-			upButton:SetScript("OnClick", function()
-				if index > 1 then
-					local movedName = table.remove(names, index)
-					table.insert(names, index - 1, movedName)
-					PSK.SelectedPlayer = movedName
-					PSK.SelectedPlayerRow = index - 1
-					PSK:DebouncedRefreshPlayerList()
-
-					-- Flash effect
-					row.bg:SetColorTexture(0.2, 0.8, 0.2, 0.4)
-					C_Timer.After(0.1, function()
-						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
-					end)
-
-					-- Play sound
-					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-				end
-			end)
-
-
-            -- Add Down Arrow with Flash Animation
-			local downButton = CreateFrame("Button", nil, row)
-			downButton:SetSize(24, 24)
-			downButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-			downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-			downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
-			downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
-
-			downButton:SetScript("OnClick", function()
-				if index < #names then
-					local movedName = table.remove(names, index)
-					table.insert(names, index + 1, movedName)
-					PSK.SelectedPlayer = movedName
-					PSK.SelectedPlayerRow = index + 1
-					PSK:DebouncedRefreshPlayerList()
-
-					-- Flash effect
-					row.bg:SetColorTexture(0.8, 0.2, 0.2, 0.4)
-					C_Timer.After(0.1, function()
-						row.bg:SetColorTexture(0, 0.5, 1, 0.15)
-					end)
-
-					-- Play sound
-					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-				end
-			end)
+			row.bg:SetColorTexture(0.2, 0.8, 0.2, 0.25)  -- soft green with some transparency
+			row.bg:Show()
         end
-
+		
         -- Tooltip
-		if not row.tooltipBound then
-			row:SetScript("OnEnter", function(self)
-				if self.playerData then
-					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-					GameTooltip:ClearLines()
-					local tcoords = CLASS_ICON_TCOORDS[class]
-					if tcoords then
-						local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
-							tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
-						GameTooltip:AddLine(icon .. self.playerData.name, RAID_CLASS_COLORS[class].r, RAID_CLASS_COLORS[class].g, RAID_CLASS_COLORS[class].b)
-					else
-						GameTooltip:AddLine(self.playerData.name or "Unknown")
-					end
+		row:SetScript("OnEnter", function(self)
+			if self.playerData then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:ClearLines()
 
-					GameTooltip:AddLine("Level: " .. self.playerData.level, 0.8, 0.8, 0.8)
-					GameTooltip:AddLine("Location: " .. self.playerData.zone, 0.8, 0.8, 0.8)
-					GameTooltip:Show()
+				local class = self.playerData.class or "SHAMAN"
+				local name = self.playerData.name or "Unknown"
+				local tcoords = CLASS_ICON_TCOORDS[class]
+				if tcoords then
+					local icon = string.format("|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:16:16:0:0:256:256:%d:%d:%d:%d|t ",
+						tcoords[1]*256, tcoords[2]*256, tcoords[3]*256, tcoords[4]*256)
+					local classColor = RAID_CLASS_COLORS[class] or {r = 1, g = 1, b = 1}
+					GameTooltip:AddLine(icon .. name, classColor.r, classColor.g, classColor.b)
+				else
+					GameTooltip:AddLine(name)
 				end
-			end)
-			row:SetScript("OnLeave", GameTooltip_Hide)
-			
-			row.tooltipBound = true
-		end 
+
+				GameTooltip:AddLine("Level: " .. tostring(self.playerData.level), 0.8, 0.8, 0.8)
+				GameTooltip:AddLine("Location: " .. tostring(self.playerData.zone), 0.8, 0.8, 0.8)
+				GameTooltip:AddLine("Last Raided: " .. tostring(self.playerData.dateLastRaided), 0.8, 0.8, 0.8)
+				GameTooltip:Show()
+			end
+		end)
+
+		row:SetScript("OnLeave", GameTooltip_Hide)
+
 		
         yOffset = yOffset - 22
     end
@@ -768,62 +1035,68 @@ function PSK:RefreshPlayerList()
 		end
 	end
 	
+	-- if not PSK.SelectedPlayer then
+		-- PSK.MoveUpButton:Hide()
+		-- PSK.MoveDownButton:Hide()
+	-- end
+
+
 	-- Broadcast update
-	-- PSK:BroadcastUpdate("RefreshPlayerList")
+	-- SK:BroadcastUpdate("RefreshPlayerList")
 end
 
 
 --------------------------------------------------------
 -- Update player databases to ensure data is up to date
 --------------------------------------------------------
-function PSK:UpdatePlayerData()
-    if not PSKDB.Players then
-        PSKDB.Players = {}
-    end
+-- function PSK:UpdatePlayerData()
+    -- if not PSKDB.Players then
+        -- PSKDB.Players = {}
+    -- end
 
-    for i = 1, GetNumGuildMembers() do
-        local fullName, _, _, level, _, _, _, _, online, _, classFileName = GetGuildRosterInfo(i)
-        local shortName = Ambiguate(fullName or "", "short")
-        local class = classFileName or "SHAMAN"
+    -- for i = 1, GetNumGuildMembers() do
+        -- local fullName, _, _, level, _, _, _, _, online, _, classFileName = GetGuildRosterInfo(i)
+        -- local shortName = Ambiguate(fullName or "", "short")
+        -- local class = classFileName or "SHAMAN"
 
-        -- Ensure the player data is stored
-        if not PSKDB.Players[shortName] then
-            PSKDB.Players[shortName] = {
-                class = class,
-                online = online,
-                inRaid = false,
-                level = level,
-                zone = "Unknown",
-            }
-        end
+        -- -- Ensure the player data is stored
+        -- if not PSKDB.Players[shortName] then
+            -- PSKDB.Players[shortName] = {
+                -- class = class,
+                -- online = online,
+                -- inRaid = false,
+                -- level = level,
+                -- zone = "Unknown",
+            -- }
+        -- end
 
-        -- Update online status
-        PSKDB.Players[shortName].online = online
+        -- -- Update online status
+        -- PSKDB.Players[shortName].online = online
 
-        -- Check if the player is in your current raid
-        if IsInRaid() then
-            for j = 1, GetNumGroupMembers() do
-                local unit = "raid" .. j
-                if UnitName(unit) == shortName then
-                    PSKDB.Players[shortName].inRaid = true
-                    PSKDB.Players[shortName].online = true
-                    break
-                else
-                    PSKDB.Players[shortName].inRaid = false
-                end
-            end
-        else
-            PSKDB.Players[shortName].inRaid = false
-        end
-    end
-end
+        -- -- Check if the player is in your current raid
+        -- if IsInRaid() then
+            -- for j = 1, GetNumGroupMembers() do
+                -- local unit = "raid" .. j
+                -- if UnitName(unit) == shortName then
+                    -- PSKDB.Players[shortName].inRaid = true
+                    -- PSKDB.Players[shortName].online = true
+                    -- break
+                -- else
+                    -- PSKDB.Players[shortName].inRaid = false
+                -- end
+            -- end
+        -- else
+            -- PSKDB.Players[shortName].inRaid = false
+        -- end
+    -- end
+-- end
 
 
 
 ---------------------------------------------------
 -- Handle delayed refresh after combat
 ---------------------------------------------------
--- Create a dedicated event frame for combat-related events
+-- -- Create a dedicated event frame for combat-related events
 if not PSK.EventFrame then
     PSK.EventFrame = CreateFrame("Frame")
 end
@@ -834,9 +1107,8 @@ PSK.EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 -- Handle the event
 PSK.EventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_REGEN_ENABLED" then
-        PSK:DebouncedRefreshPlayerList()
+        PSK:DebouncedRefreshPlayerLists()
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        print("[PSK] Player list updated after combat.")
     end
 end)
 
@@ -859,11 +1131,34 @@ local function SortPlayers(players)
     end)
 end
 
+
+------------------------------------------
+-- Check if player is in list
+------------------------------------------
+
+function PSK:IsPlayerInList(list, targetName)
+    for _, entry in ipairs(list) do
+        if type(entry) == "table" and entry.name == targetName then
+            return true
+        elseif type(entry) == "string" and entry == targetName then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+
 ---------------------------------------------------
 -- Refresh the Available player lists
 ---------------------------------------------------
 
-function PSK:RefreshAvailablePlayerList()
+function PSK:RefreshAvailablePlayerLists()
+	-- Get or Init lists in databases
+	PSKDB.MainList = PSKDB.MainList or {}
+    PSKDB.TierList = PSKDB.TierList or {}
+	
     -- Get the scroll children
     local mainChild = PSK.ScrollChildren.MainAvailable
     local tierChild = PSK.ScrollChildren.TierAvailable
@@ -885,6 +1180,7 @@ function PSK:RefreshAvailablePlayerList()
 
     local mainList = PSKDB.MainList or {}
     local tierList = PSKDB.TierList or {}
+
     local availableMain = {}
     local availableTier = {}
 
@@ -895,10 +1191,11 @@ function PSK:RefreshAvailablePlayerList()
         local class = classFileName or "SHAMAN"
 
         if level == 60 then
-            if not tContains(mainList, shortName) then
+            if not PSK:IsPlayerInList(mainList, shortName) then
                 table.insert(availableMain, {name = shortName, online = online, class = class})
             end
-            if not tContains(tierList, shortName) then
+			
+            if not PSK:IsPlayerInList(tierList, shortName) then
                 table.insert(availableTier, {name = shortName, online = online, class = class})
             end
         end
@@ -908,7 +1205,7 @@ function PSK:RefreshAvailablePlayerList()
 	SortPlayers(availableMain)
 	SortPlayers(availableTier)
 
-    -- Function to add player rows
+     -- Function to add player rows
     local function AddPlayerRow(parent, player)
         local row = CreateFrame("Frame", nil, parent)
         row:SetSize(320, 20)
@@ -920,12 +1217,32 @@ function PSK:RefreshAvailablePlayerList()
         addButton:SetText("+")
         addButton:SetPoint("LEFT", row, "LEFT", 0, 0)
         addButton:SetScript("OnClick", function()
-            local list = (parent == mainChild) and PSKDB.MainList or PSKDB.TierList
-            table.insert(list, player.name)
-            PSK:DebouncedRefreshAvailablePlayerList()
-            PSK:DebouncedRefreshPlayerList()
-            print("[PSK] Added " .. player.name .. " to the " .. ((parent == mainChild) and "Main" or "Tier") .. " List.")
-        end)
+			addButton:Disable()
+			C_Timer.After(0.5, function() addButton:Enable() end)
+
+			local listName = (parent == mainChild) and "Main" or "Tier"
+			local list = (listName == "Main") and PSKDB.MainList or PSKDB.TierList
+
+			-- Prevent duplicate entries
+			for _, entry in ipairs(list) do
+				if type(entry) == "table" and entry.name == player.name then
+					print("[PSK] " .. player.name .. " is already in the " .. listName .. " list.")
+					return
+				end
+			end
+
+			table.insert(list, {
+				name = player.name,
+				class = player.class or "UNKNOWN",
+				dateLastRaided = "Never"
+			})
+
+			PSK:DebouncedRefreshAvailablePlayerLists()
+			PSK:DebouncedRefreshPlayerLists()
+			print("[PSK] Added " .. player.name .. " to the " .. listName .. " List.")
+		end)
+
+
 
         -- Class Icon
         local classIcon = row:CreateTexture(nil, "ARTWORK")
@@ -1006,42 +1323,8 @@ function PSK:RefreshAvailablePlayerList()
     for _, player in ipairs(availableTier) do
         AddPlayerRow(tierChild, player)
     end
+
 end
-
-
-
-
----------------------------------------------------
--- Highlight the selected player in main/tier list
----------------------------------------------------
-
-function PSK:HighlightSelectedPlayer()
-    local scrollChildren = PSK.ScrollChildren.Main
-    if not scrollChildren or not PSK.SelectedPlayer then return end
-
-    for _, row in ipairs({scrollChildren:GetChildren()}) do
-        if row.playerData and row.playerData.name == PSK.SelectedPlayer then
-            if not row.Highlight then
-                row.Highlight = row:CreateTexture(nil, "ARTWORK")
-                row.Highlight:SetAllPoints(row)
-                row.Highlight:SetBlendMode("ADD")
-            end
-
-            -- Set highlight to class color
-            local class = row.playerData.class or "SHAMAN"
-            local color = RAID_CLASS_COLORS[class] or { r = 1, g = 1, b = 1 }
-            row.Highlight:SetColorTexture(color.r, color.g, color.b, 0.25)
-            row.Highlight:Show()
-        else
-            if row.Highlight then
-                row.Highlight:Hide()
-            end
-        end
-    end
-end
-
-
-
 
 
 
@@ -1115,7 +1398,9 @@ function PSK:RefreshBidList()
             row.posText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             row.posText:SetPoint("LEFT", row, "LEFT", 5, 0)
         end
-        row.posText:SetText(bidData.position)
+		
+		row.posText:SetText(index)
+        -- row.posText:SetText(bidData.position)
 
         -- Class Icon
         local class = bidData.class or "SHAMAN"
@@ -1136,38 +1421,6 @@ function PSK:RefreshBidList()
         end
         row.nameText:SetText(bidData.name)
 
-        -- Warning Icon
-        if bidData.notListed and not row.warningIcon then
-            row.warningIcon = row:CreateTexture(nil, "OVERLAY")
-            row.warningIcon:SetSize(16, 16)
-            row.warningIcon:SetPoint("LEFT", row.nameText, "RIGHT", 8, 0)
-            row.warningIcon:SetTexture("Interface\\Common\\UI-StopButton")
-
-            row.warningIcon:SetScript("OnEnter", function()
-                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-                GameTooltip:SetText(bidData.name, 1, 0.2, 0.2)
-                GameTooltip:AddLine("This player is not in the Main or Tier lists.", 1, 0.7, 0.2)
-                GameTooltip:Show()
-            end)
-            row.warningIcon:SetScript("OnLeave", GameTooltip_Hide)
-
-            local pulse = row:CreateAnimationGroup()
-            local fadeOut = pulse:CreateAnimation("Alpha")
-            fadeOut:SetFromAlpha(0.8)
-            fadeOut:SetToAlpha(0.4)
-            fadeOut:SetDuration(0.5)
-            fadeOut:SetOrder(1)
-            local fadeIn = pulse:CreateAnimation("Alpha")
-            fadeIn:SetFromAlpha(0.4)
-            fadeIn:SetToAlpha(0.8)
-            fadeIn:SetDuration(0.5)
-            fadeIn:SetOrder(2)
-            pulse:SetLooping("REPEAT")
-            pulse:Play()
-
-            row.bg:SetColorTexture(1, 0, 0, 0.2)
-            row.bg:Show()
-        end
 
         -- Award Button
         if not row.awardButton then
@@ -1178,27 +1431,32 @@ function PSK:RefreshBidList()
             row.awardButton:GetNormalTexture():SetTexCoord(0.2, 0.8, 0.2, 0.8)
             row.awardButton:SetText("")
         end
-        row.awardButton.index = index
-        row.awardButton:SetScript("OnClick", function(self)
-            local row = self:GetParent()
-            if row and row.bg then
-                row.bg:SetColorTexture(0, 1, 0, 0.4)
-                local pulse = row:CreateAnimationGroup()
-                local fadeOut = pulse:CreateAnimation("Alpha")
-                fadeOut:SetFromAlpha(1)
-                fadeOut:SetToAlpha(0)
-                fadeOut:SetDuration(0.4)
-                fadeOut:SetOrder(1)
-                local fadeIn = pulse:CreateAnimation("Alpha")
-                fadeIn:SetFromAlpha(0)
-                fadeIn:SetToAlpha(1)
-                fadeIn:SetDuration(0.4)
-                fadeIn:SetOrder(2)
-                pulse:SetLooping("NONE")
-                pulse:Play()
-            end
-            AwardPlayer(self.index)
-        end)
+		
+        local safeIndex = index  -- capture correctly
+
+		row.awardButton:SetScript("OnClick", function(self)
+			local row = self:GetParent()
+			if row and row.bg then
+				row.bg:SetColorTexture(0, 1, 0, 0.4)
+				local pulse = row:CreateAnimationGroup()
+				local fadeOut = pulse:CreateAnimation("Alpha")
+				fadeOut:SetFromAlpha(1)
+				fadeOut:SetToAlpha(0)
+				fadeOut:SetDuration(0.4)
+				fadeOut:SetOrder(1)
+				local fadeIn = pulse:CreateAnimation("Alpha")
+				fadeIn:SetFromAlpha(0)
+				fadeIn:SetToAlpha(1)
+				fadeIn:SetDuration(0.4)
+				fadeIn:SetOrder(2)
+				pulse:SetLooping("NONE")
+				pulse:Play()
+			end
+
+			PSK.SelectedPlayer = bidData.name
+			PSK:AwardPlayer(safeIndex)
+		end)
+		
         row.awardButton:SetScript("OnEnter", function(self)
             local row = self:GetParent()
             if row and row.bg then
@@ -1210,47 +1468,8 @@ function PSK:RefreshBidList()
             GameTooltip:AddLine("Click to award loot to this player.", 0.8, 0.8, 0.8)
             GameTooltip:Show()
         end)
+		
         row.awardButton:SetScript("OnLeave", function(self)
-            local row = self:GetParent()
-            if row and row.bg then
-                row.bg:Hide()
-            end
-            GameTooltip:Hide()
-        end)
-
-        -- Pass Button
-        if not row.passButton then
-            row.passButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            row.passButton:SetSize(16, 16)
-            row.passButton:SetPoint("LEFT", row.awardButton, "RIGHT", 15, 0)
-
-            local passTexture = row.passButton:CreateTexture(nil, "ARTWORK")
-            passTexture:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-            passTexture:SetAllPoints(row.passButton)
-            passTexture:SetTexCoord(0.2, 0.8, 0.2, 0.8)
-            row.passButton:SetNormalTexture(passTexture)
-
-            row.passButton:SetText("")
-        end
-        row.passButton.index = index
-        row.passButton:SetScript("OnClick", function(self)
-            if self.index then
-                table.remove(PSK.BidEntries, self.index)
-                PSK:DebouncedRefreshBidList()
-            end
-        end)
-        row.passButton:SetScript("OnEnter", function(self)
-            local row = self:GetParent()
-            if row and row.bg then
-                row.bg:SetColorTexture(1, 0.2, 0.2, 0.25)
-                row.bg:Show()
-            end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Pass on Loot", 1, 1, 1)
-            GameTooltip:AddLine("Click to remove this player from bidding.", 0.8, 0.8, 0.8)
-            GameTooltip:Show()
-        end)
-        row.passButton:SetScript("OnLeave", function(self)
             local row = self:GetParent()
             if row and row.bg then
                 row.bg:Hide()
@@ -1268,196 +1487,79 @@ function PSK:RefreshBidList()
 end
 
 
-----------------------------------------
--- Get Loot Threshold
-----------------------------------------
-
-function PSK:GetLootThresholdName()
-	local threshold = GetLootThreshold()
-	local qualityNames = {
-		[0] = "Poor",
-		[1] = "Common",
-		[2] = "Uncommon",
-		[3] = "Rare",
-		[4] = "Epic",
-		[5] = "Legendary"
-	}
-
-	return qualityNames[threshold] or ("Unknown (" .. threshold .. ")")
-end
-
--------------------------------------------
--- Update the Loot Threshold On Change
--------------------------------------------
-
-function PSK:UpdateLootThresholdLabel(newThreshold)
-    if not PSK.LootLabel then return end
-
-    -- Use the provided threshold, or default to the current settings
-    local threshold = newThreshold or PSK.Settings.lootThreshold or 3
-
-    -- Update the settings
-    PSK.Settings.lootThreshold = threshold
-    PSKDB.Settings.lootThreshold = threshold
-
-    -- Get the name and color for the threshold
-    local name = PSK.RarityNames[threshold] or "Rare"
-    local color = PSK.RarityColors[threshold] or "ffffff"
-
-    -- Update the label
-    PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
-end
-
-
---------------------------------------------
--- Add Import/Export Section to Settings Tab
---------------------------------------------
-
-function PSK:ExportLists()
-    -- Format the lists with one name per line, comma-separated
-    local function formatList(list)
-        local formatted = {}
-        for _, name in ipairs(list or {}) do
-            table.insert(formatted, name .. ",")
-        end
-        return table.concat(formatted, "\n")
-    end
-    
-    local mainList = formatList(PSKDB.MainList or {})
-    local tierList = formatList(PSKDB.TierList or {})
-    
-    return mainList, tierList
-end
-
-
--------------------------------------------
--- Import Lists from Separate Text Boxes
--------------------------------------------
-
-function PSK:ImportLists()
-    local mainText = PSK.MainListEditBox:GetText()
-    local tierText = PSK.TierListEditBox:GetText()
-
-    -- Clear current lists
-    PSKDB.MainList = {}
-    PSKDB.TierList = {}
-
-    -- Get all guild members
-    local guildMembers = {}
-    if IsInGuild() then
-        for i = 1, GetNumGuildMembers() do
-            local fullName = GetGuildRosterInfo(i)
-            if fullName then
-                local shortName = Ambiguate(fullName, "short")
-                guildMembers[shortName:lower()] = true
-            end
-        end
-    end
-
-    -- Import Main List
-    for name in mainText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-			table.insert(PSKDB.MainList, trimmedName)
-            -- if guildMembers[trimmedName:lower()] then
-                -- table.insert(PSKDB.MainList, trimmedName)
-            -- else
-                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Main List.|r")
-            -- end
-        end
-    end
-
-    -- Import Tier List
-    for name in tierText:gmatch("[^,\n]+") do
-        local trimmedName = name:match("^%s*(.-)%s*$")
-        if trimmedName ~= "" then
-            
-			table.insert(PSKDB.TierList, trimmedName)
-			-- if guildMembers[trimmedName:lower()] then
-                -- table.insert(PSKDB.TierList, trimmedName)
-            -- else
-                -- print("|cffff0000[PSK] Warning: " .. trimmedName .. " is not in your guild and was not added to the Tier List.|r")
-            -- end
-        end
-    end
-
-    -- Update the UI
-    PSK:DebouncedRefreshPlayerList()
-    print("[PSK] Import complete. Main List: " .. #PSKDB.MainList .. " players, Tier List: " .. #PSKDB.TierList .. " players.")
-end
 
 
 -------------------------------------------
 -- Refresh member data when group changes.
 -------------------------------------------
 
-function PSK:RefreshGroupMemberData()
-    local function updateIfNeeded(unit)
-        if not UnitExists(unit) then return end
+-- function PSK:RefreshGroupMemberData()
+    -- local function updateIfNeeded(unit)
+        -- if not UnitExists(unit) then return end
 
-        local name = Ambiguate(UnitName(unit), "short")
-        if not name then return end
+        -- local name = Ambiguate(UnitName(unit), "short")
+        -- if not name then return end
 
-        local listed = false
-        for _, n in ipairs(PSKDB.MainList) do
-            if Ambiguate(n, "short") == name then
-                listed = true
-                break
-            end
-        end
-        for _, n in ipairs(PSKDB.TierList) do
-            if Ambiguate(n, "short") == name then
-                listed = true
-                break
-            end
-        end
+        -- local listed = false
+        -- for _, n in ipairs(PSKDB.MainList) do
+            -- if Ambiguate(n, "short") == name then
+                -- listed = true
+                -- break
+            -- end
+        -- end
+        -- for _, n in ipairs(PSKDB.TierList) do
+            -- if Ambiguate(n, "short") == name then
+                -- listed = true
+                -- break
+            -- end
+        -- end
 
-        if not listed then return end
+        -- if not listed then return end
 
-        local data = PSKDB.Players[name]
-		local needsUpdate = false
+        -- local data = PSKDB.Players[name]
+		-- local needsUpdate = false
 
-		if not data then
-			needsUpdate = true
-		else
-			if data.class == "UNKNOWN" or data.class == "SHAMAN" then
-				needsUpdate = true
-			elseif data.level == "???" or not tonumber(data.level) then
-				needsUpdate = true
-			end
-		end
+		-- if not data then
+			-- needsUpdate = true
+		-- else
+			-- if data.class == "UNKNOWN" or data.class == "SHAMAN" then
+				-- needsUpdate = true
+			-- elseif data.level == "???" or not tonumber(data.level) then
+				-- needsUpdate = true
+			-- end
+		-- end
 
 
-        if needsUpdate then
-            local _, class = UnitClass(unit)
-            local level = UnitLevel(unit)
-            local zone = GetZoneText()
-            local online = UnitIsConnected(unit)
-            local inRaid = UnitInRaid(unit) ~= nil
+        -- if needsUpdate then
+            -- local _, class = UnitClass(unit)
+            -- local level = UnitLevel(unit)
+            -- local zone = GetZoneText()
+            -- local online = UnitIsConnected(unit)
+            -- local inRaid = UnitInRaid(unit) ~= nil
 
-            PSKDB.Players[name] = {
-                class = class or "UNKNOWN",
-                level = level or "???",
-                zone = zone or "Unknown",
-                online = online or false,
-                inRaid = inRaid,
-            }
+            -- PSKDB.Players[name] = {
+                -- class = class or "UNKNOWN",
+                -- level = level or "???",
+                -- zone = zone or "Unknown",
+                -- online = online or false,
+                -- inRaid = inRaid,
+            -- }
 
-            PSK:DebouncedRefreshPlayerList()
-        end
-    end
+            -- PSK:DebouncedRefreshPlayerLists()
+        -- end
+    -- end
 
-    if IsInRaid() then
-        for i = 1, MAX_RAID_MEMBERS do
-            updateIfNeeded("raid" .. i)
-        end
-    elseif IsInGroup() then
-        for i = 1, GetNumGroupMembers() - 1 do
-            updateIfNeeded("party" .. i)
-        end
-        updateIfNeeded("player") -- also update the user themselves if listed
-    end
-end
+    -- if IsInRaid() then
+        -- for i = 1, MAX_RAID_MEMBERS do
+            -- updateIfNeeded("raid" .. i)
+        -- end
+    -- elseif IsInGroup() then
+        -- for i = 1, GetNumGroupMembers() - 1 do
+            -- updateIfNeeded("party" .. i)
+        -- end
+        -- updateIfNeeded("player") -- also update the user themselves if listed
+    -- end
+-- end
 
 
 ------------------------------------------------
@@ -1529,27 +1631,25 @@ function PSK:GetOrCreateRow(index, parent, rowType)
 end
 
 
-
-
 -------------------------------------------
 -- Refresh only after a short delay
 -------------------------------------------
 
-function PSK:DebouncedRefreshAvailablePlayerList()
+function PSK:DebouncedRefreshAvailablePlayerLists()
     if refreshAvailablePlayers then return end
     refreshAvailablePlayers = true
     C_Timer.After(0.5, function()
         refreshAvailablePlayers = false
-        PSK:RefreshAvailablePlayerList()
+        PSK:RefreshAvailablePlayerLists()
     end)
 end
 
-function PSK:DebouncedRefreshPlayerList()
+function PSK:DebouncedRefreshPlayerLists()
     if refreshPlayerScheduled then return end
     refreshPlayerScheduled = true
     C_Timer.After(0.5, function()
         refreshPlayerScheduled = false
-        PSK:RefreshPlayerList()
+        PSK:RefreshPlayerLists()
     end)
 end
 
@@ -1579,6 +1679,46 @@ function PSK:DebouncedRefreshLogList()
         PSK:RefreshLogList()
     end)
 end
+
+-------------------------------------------
+-- Logging function
+-------------------------------------------
+
+-- function print(msg, ...)
+	-- if PSK.Settings and PSK.Settings.debugEnabled then
+		-- print("[PSK DEBUG]    ", string.format(msg, ...))
+	-- end
+-- end
+
+
+
+--------------------------------------------
+-- Update last raid date
+--------------------------------------------
+
+-- function PSK:UpdateLastRaidDate(playerName)
+	-- local function update(list)
+		-- for _, entry in ipairs(list) do
+			-- if entry.name == playerName then
+				-- entry.dateLastRaided = date("%m-%d-%Y")
+				-- return
+			-- end
+		-- end
+	-- end
+	
+	-- update(PSKDB.MainList)
+	-- update(PSKDB.TierList)
+-- end
+
+
+
+------------------------------
+-- Converts table name entry
+------------------------------
+
+-- function PSK:GetName(entry)
+    -- return type(entry) == "table" and entry.name or entry
+-- end
 
 
 -------------------------------------------

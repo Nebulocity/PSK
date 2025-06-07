@@ -6,9 +6,9 @@ local PSK = select(2, ...)
 ------------------------
 
 if not PSKDB then PSKDB = {} end
-PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 1 } -- change to 3 for rare
+PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 3 } -- default to 3 for rare
 PSK.Settings = CopyTable(PSKDB.Settings)
-local mainListCount = #PSKDB.MainList or 0
+-- local mainListCount = #PSKDB.MainList or 0
 local pskTabScrollFrameHeight = -115
 local manageTabScrollFrameHeight = -87
 
@@ -120,7 +120,7 @@ PSK.ImportExportFrame:Hide()
 -- Import/Export Frames
 ------------------------------
 
--- Path to your custom parchment texture
+-- Path to custom parchment texture
 local parchmentTexture = "Interface\\AddOns\\PSK\\Media\\parchment.png"
 
 
@@ -262,47 +262,6 @@ end)
 
 PSK.TierListEditBox = tierEditBox
 
-------------------------------
--- Import Button
-------------------------------
-
-local importButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
-importButton:SetSize(120, 30)
-importButton:SetPoint("BOTTOMLEFT", PSK.ImportExportFrame, "BOTTOMLEFT", 20, 20)
-importButton:SetText("Import")
-
-importButton:SetScript("OnClick", function()
-    local mainText = PSK.MainListEditBox:GetText()
-    local tierText = PSK.TierListEditBox:GetText()
-   
-
-    -- Show the confirmation dialog
-    StaticPopup_Show("PSK_CONFIRM_IMPORT")
-end)
-
-------------------------------
--- Export Button
-------------------------------
-
-local exportButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
-exportButton:SetSize(120, 30)
-exportButton:SetPoint("BOTTOMRIGHT", PSK.ImportExportFrame, "BOTTOMRIGHT", -20, 20)
-exportButton:SetText("Export")
-exportButton:SetScript("OnClick", function()
-    local mainList, tierList = PSK:ExportLists()
-    PSK.MainListEditBox:SetText(mainList)
-    PSK.TierListEditBox:SetText(tierList)
-    PSK.MainListEditBox:HighlightText()
-    PSK.TierListEditBox:HighlightText()
-    PSK.MainListEditBox:SetFocus()
-    print("[PSK] Lists Exported Successfully")
-end)
-
-
-
-
-
-
 
 
 ---------------------------------------------
@@ -317,7 +276,7 @@ PSK.CurrentList = "Main"
 ----------------------------------------------
 
 local playerScroll, playerChild, playerFrame, playerHeader =
-    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, pskTabScrollFrameHeight, "PSK Main (" .. mainListCount .. ")")
+    CreateBorderedScrollFrame("PSKScrollFrame", PSK.ContentFrame, 10, pskTabScrollFrameHeight, "PSK Main ( .. mainListCount .. )")
 PSK.ScrollFrames.Main = playerScroll
 PSK.ScrollChildren.Main = playerChild
 playerHeader:ClearAllPoints()
@@ -337,13 +296,13 @@ lootHeader:ClearAllPoints()
 lootHeader:SetPoint("TOPLEFT", lootScroll, "TOPLEFT", 0, 20)
 PSK.Headers.Loot = lootHeader
 
-----------------------------------------------
+--------------------------------------------
 -- Parent Bidding scroll frame to ContentFrame
 ----------------------------------------------
 
 local bidCount = (PSK.BidEntries and #PSK.BidEntries) or 0
 local bidScroll, bidChild, bidFrame, bidHeader =
-    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, pskTabScrollFrameHeight, "Bids (" .. bidCount .. ")", 220)
+    CreateBorderedScrollFrame("PSKBidScrollFrame", PSK.ContentFrame, 470, pskTabScrollFrameHeight, "Bids ( .. bidCount .. )", 220)
 PSK.ScrollFrames.Bid = bidScroll
 PSK.ScrollChildren.Bid = bidChild
 bidHeader:ClearAllPoints()
@@ -356,21 +315,13 @@ PSK.Headers.Bid = bidHeader
 
 local mainHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 mainHeader:SetPoint("TOPLEFT", 10, -10)
--- mainHeader:SetText("Available for Main List")
 
 local tierHeader = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 tierHeader:SetPoint("TOPLEFT", 365, -10)
--- tierHeader:SetText("Available for Tier List")
 
 -- Create the two scroll lists
 local mainScroll, mainChild, mainFrame, mainScrollHeader = CreateBorderedScrollFrame("PSKMainAvailableScroll", PSK.ManageFrame, 2, manageTabScrollFrameHeight, "Available PSK Main Members")
 local tierScroll, tierChild, tierFrame, tierScrollHeader = CreateBorderedScrollFrame("PSKTierAvailableScroll", PSK.ManageFrame, 232, manageTabScrollFrameHeight, "Available PSK Tier Members")
-
--- Add Instructions Label to Manage Frame
--- local instructionsLabel = PSK.ManageFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
--- instructionsLabel:SetPoint("TOP", PSK.ManageFrame, "TOP", 0, -25)
--- instructionsLabel:SetText("Click the + sign to add a player to each respective list.")
--- instructionsLabel:SetTextColor(1, 0.85, 0.1)  -- Gold-like color
 
 -- Set headers for scroll lists
 mainScrollHeader:SetPoint("TOPLEFT", mainScroll, "TOPLEFT", 0, 20)
@@ -426,8 +377,6 @@ textRight:SetText(" to add a player to each respective list.")
 textRight:SetTextColor(1, 0.85, 0.1)
 
 
-
-
 ------------------------------------------------
 -- Dialog for clearing loot drops
 ------------------------------------------------
@@ -437,47 +386,13 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LOOT"] = {
     button1 = "Yes",
     button2 = "Cancel",
 	OnAccept = function()
+		PSKDB.LootDrops = PSKDB.LootDrops or {}
 		wipe(PSKDB.LootDrops)
-		PSK.LootDrops = PSKDB.LootDrops
-		PSK:DebouncedRefreshLootList()
+		PSK:RefreshLootList()
 	end
 
 }
 
-----------------------------------------------
--- Warning if loot not being recorded
-----------------------------------------------
-
-local lootRecordingWarning = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-lootRecordingWarning:SetPoint("CENTER", lootHeader, "CENTER", 80, 20)
-lootRecordingWarning:SetText(">>> Loot is not being recorded! <<<")
-lootRecordingWarning:SetTextColor(1, 0, 0)
-lootRecordingWarning:Hide()
-
-----------------------------------------------
--- Pulse the loot warning
-----------------------------------------------
-local lootPulse = lootRecordingWarning:CreateAnimationGroup()
-
-local lootFadeOut = lootPulse:CreateAnimation("Alpha")
-lootFadeOut:SetFromAlpha(1)
-lootFadeOut:SetToAlpha(0.2)
-lootFadeOut:SetDuration(0.5)
-lootFadeOut:SetOrder(1)
-
-local lootFadeIn = lootPulse:CreateAnimation("Alpha")
-lootFadeIn:SetFromAlpha(0.2)
-lootFadeIn:SetToAlpha(1)
-lootFadeIn:SetDuration(0.5)
-lootFadeIn:SetOrder(2)
-
-lootPulse:SetLooping("REPEAT")
-lootRecordingWarning.pulse = lootPulse
-
-------------------------------------------------
--- To check whether loot is recording elsewhere
-------------------------------------------------
-PSK.RecordingWarningDrops = lootRecordingWarning
 
 ------------------------------
 -- Create Log scroll frame
@@ -489,77 +404,14 @@ PSK.ScrollFrames.Logs = logScroll
 PSK.ScrollChildren.Logs = logChild
 PSK.Headers.Logs = logHeader
 
-----------------------------------
--- Warning for not recording loot
-----------------------------------
 
-local recordingWarning = PSK.LogsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-recordingWarning:SetPoint("LEFT", logHeader, "RIGHT", 10, 0)
-recordingWarning:SetText("Loot is not being recorded!")
-recordingWarning:SetTextColor(1, 0, 0)
-recordingWarning:Hide()
-
-----------------------------------
--- Warning pulse animation
-----------------------------------
-
-local pulse = recordingWarning:CreateAnimationGroup()
-local fadeOut = pulse:CreateAnimation("Alpha")
-fadeOut:SetFromAlpha(1)
-fadeOut:SetToAlpha(0.2)
-fadeOut:SetDuration(0.5)
-fadeOut:SetOrder(1)
-
-local fadeIn = pulse:CreateAnimation("Alpha")
-fadeIn:SetFromAlpha(0.2)
-fadeIn:SetToAlpha(1)
-fadeIn:SetDuration(0.5)
-fadeIn:SetOrder(2)
-
-pulse:SetLooping("REPEAT")
-recordingWarning.pulse = pulse
-
-PSK.RecordingWarningLogs = recordingWarning
-
-------------------------------
--- Set loot thresholds
-------------------------------
-
-local threshold = PSK.Settings and PSK.Settings.lootThreshold or 3
- PSK.RarityNames = {
-    [0] = "Poor",
-    [1] = "Common",
-    [2] = "Uncommon",
-    [3] = "Rare",
-    [4] = "Epic",
-    [5] = "Legendary"
-}
-
- PSK.RarityColors = {
-    [0] = "9d9d9d", -- Poor
-    [1] = "ffffff", -- Common
-    [2] = "1eff00", -- Uncommon
-    [3] = "0070dd", -- Rare
-    [4] = "a335ee", -- Epic
-    [5] = "ff8000", -- Legendary
-}
-
-------------------------------
--- Set Loot Threshold Header
-------------------------------
-
-local rarityName = PSK.RarityNames[threshold] or "?"
-local upArrow = "|TInterface\\AddOns\\PSK\\media\\arrow_up.tga:24:24|t"
-local dropCount = #PSK.LootDrops
-lootHeader:SetText("Loot Drops")
--- lootHeader:SetText("Loot Drops (" .. tostring(#(PSK.LootDrops or {})) .. ") " .. rarityName .. "+")
 
 ------------------------------
 -- Create Tabs for MainFrame
 ------------------------------
 
 PSK.Tabs = {}
-PanelTemplates_SetNumTabs(PSK.MainFrame, 5)
+PanelTemplates_SetNumTabs(PSK.MainFrame, 4)
 
 ------------------------------
 -- Set Tab 1 (PSK)
@@ -572,6 +424,7 @@ tab1:SetPoint("BOTTOMLEFT", PSK.MainFrame, "BOTTOMLEFT", 10, -30)
 PanelTemplates_TabResize(tab1, 0)
 PSK.Tabs[1] = tab1
 
+
 ------------------------------
 -- Set Tab 2 (Manage)
 ------------------------------
@@ -583,82 +436,53 @@ tab2:SetPoint("LEFT", tab1, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab2, 0)
 PSK.Tabs[2] = tab2
 
+
 ------------------------------
--- Set Tab 3 (Settings)
+-- Set Tab 3 (Logs)
 ------------------------------
 
 local tab3 = CreateFrame("Button", "PSKMainFrameTab3", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab3:SetID(3)
-tab3:SetText("Settings")
+tab3:SetText("Logs")
 tab3:SetPoint("LEFT", tab2, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab3, 0)
 PSK.Tabs[3] = tab3
 
 ------------------------------
--- Set Tab 4 (Logs)
+-- Tab 4 (Import/Export)
 ------------------------------
 
 local tab4 = CreateFrame("Button", "PSKMainFrameTab4", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
 tab4:SetID(4)
-tab4:SetText("Logs")
+tab4:SetText("Import/Export")
 tab4:SetPoint("LEFT", tab3, "RIGHT", -16, 0)
 PanelTemplates_TabResize(tab4, 0)
 PSK.Tabs[4] = tab4
 
-------------------------------
--- Tab 5 (Import/Export)
-------------------------------
 
-local tab5 = CreateFrame("Button", "PSKMainFrameTab5", PSK.MainFrame, "CharacterFrameTabButtonTemplate")
-tab5:SetID(5)
-tab5:SetText("Import/Export")
-tab5:SetPoint("LEFT", tab4, "RIGHT", -16, 0)
-PanelTemplates_TabResize(tab5, 0)
-PSK.Tabs[5] = tab5
-
-------------------------------
--- Create Settings UI
-------------------------------
-
-local settingsTitle = PSK.SettingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-settingsTitle:SetPoint("TOP", 0, -40)
-settingsTitle:SetText("PSK Settings")
-
---------------------------------
--- Enable/Disable Sound Effects
---------------------------------
-
-local soundCheckbox = CreateFrame("CheckButton", nil, PSK.SettingsFrame, "ChatConfigCheckButtonTemplate")
-soundCheckbox:SetPoint("TOPLEFT", 20, -80) 
-soundCheckbox.Text:SetText("Button Sounds")
-soundCheckbox:SetChecked(PSK.Settings.buttonSoundsEnabled)
-
-soundCheckbox:SetScript("OnClick", function(self)
-    local enabled = self:GetChecked()
-    PSK.Settings.buttonSoundsEnabled = enabled
-
-    -- Ensure PSKDB.Settings exists before we update it
-    if not PSKDB then PSKDB = {} end
-    if not PSKDB.Settings then PSKDB.Settings = {} end
-    PSKDB.Settings.buttonSoundsEnabled = enabled
-
-    print("[PSK] Button sounds " .. (enabled and "enabled." or "disabled."))
-end)
 
 ------------------------------
 -- Tab-Switching Logic
 ------------------------------
 
 hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
-    local tabID = self:GetID()
-    PanelTemplates_SetTab(PSK.MainFrame, tabID)
 
-    -- Deselect all tabs
-    for _, tab in ipairs(PSK.Tabs) do
-        if tab:GetID() ~= tabID then
-            PanelTemplates_DeselectTab(tab)
-        end
+	-- Only respond to tab clicks that are children of PSKMainFrame
+    if not self or not self:GetParent() or self:GetParent():GetName() ~= "PSKMainFrame" then
+        return
     end
+	
+    local tabID = self:GetID()
+	
+    -- PanelTemplates_SetTab(PSK.MainFrame, tabID)
+	for i, tab in ipairs(PSK.Tabs) do
+		if i == tabID then
+			PanelTemplates_SelectTab(tab)
+		else
+			PanelTemplates_DeselectTab(tab)
+		end
+	end
+
 
     -- Hide all frames first
     PSK.ContentFrame:Hide()
@@ -672,12 +496,10 @@ hooksecurefunc("PanelTemplates_Tab_OnClick", function(self)
         PSK.ContentFrame:Show()
     elseif tabID == 2 then
         PSK.ManageFrame:Show()
-        PSK:DebouncedRefreshAvailablePlayerList()
+        PSK:DebouncedRefreshAvailablePlayerLists()
     elseif tabID == 3 then
-        PSK.SettingsFrame:Show()
-    elseif tabID == 4 then
         PSK.LogsFrame:Show()
-    elseif tabID == 5 then
+    elseif tabID == 4 then
         PSK.ImportExportFrame:Show()
     end
 end)
@@ -701,6 +523,7 @@ end)
         preferredIndex = 3,
     }
 	
+			
 	
 ----------------------------------
 -- Set the default selected tab
@@ -715,26 +538,16 @@ PSK.LogsFrame:Hide()
 PSKImportExportFrame:Hide()
 
 
-
-
-
-
-
-
-
-
 ----------------------------------
 -- Refresh lists on load
 ----------------------------------
 
 C_Timer.After(0.1, function()
-    if PSK.RefreshLogList then
-        PSK:UpdateLootThresholdLabel()
-		-- PSK:CreateImportExportSection()
-		PSK:DebouncedRefreshLogList()
-		PSK:DebouncedRefreshLootList()
-		PSK:DebouncedRefreshPlayerList()
-		PSK:DebouncedRefreshBidList()
-    end
+	PSK:DebouncedRefreshAvailablePlayerLists()
+	PSK:DebouncedRefreshPlayerLists()
+	PSK:DebouncedRefreshLootList()
+	-- PSK:CreateImportExportSection()
+	PSK:DebouncedRefreshLogList()	
+	PSK:DebouncedRefreshBidList()
 end)
 
