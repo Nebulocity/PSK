@@ -62,17 +62,13 @@ Features:
 Commands:
 - /psk
   - Opens the addon window.
-- /psk help
+- /pskhelp
   - Will show all commands available to the addon
 - /pskadd <top|bottom> <main|tier> <playername>
   - /pskadd top main taurbucks = Adds the player "Taurbucks" to the top of the main KSK list.
   - /pskadd top tier taurbucks = Adds the player "Taurbucks" to the top of the tier KSK list.
-- /pskremove <playername>
-  - /pskremove "taurbucks" = removes the player "Taurbucks" from the currently viewed list in the addon (Main or Tier)
-- /pskremove all <playername>
-  - /pskremove all "taurbucks" = removes the player "Taurbucks" from both the Main and Tier lists.
-- /psk list
-  - Will show all players in the currently viewed list in the addon (Main or Tier).
+- /pskclear
+  - This will wipe both the Main and Tier lists in PSK.  This is IRREVERSIBLE!
 
 
 Planned Features:
