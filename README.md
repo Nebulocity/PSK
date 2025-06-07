@@ -1,10 +1,11 @@
-![Screenshot_20250501-095628](https://github.com/user-attachments/assets/2a244b28-2a96-45ad-bb37-474372a386a4)
 
 Perchance PSK Addon.
 
 This addon tracks a "Main" and "Tier" list for KSK loot distribution standings.
 
 Features:
+
+<img width="894" alt="Main" src="https://github.com/user-attachments/assets/46850b26-311a-4786-aec0-b7810e839ba5" />
 
 - "PSK" tab:
   - The Main/Tier PSK list is displayed on the left.  This is populated in the "Manage" tab.
@@ -34,6 +35,8 @@ Features:
             - The awarded player then gets moved to the bottom of the PSK list.
         - The Bids list is cleared, and the Loot Drop being bid on is removed from the Loot Drops list.
 
+<img width="894" alt="Main" src="https://github.com/user-attachments/assets/21098707-2b82-40b4-a213-e8f11782fbf9" />
+
 - "Manage" Tab:
   - Two lists display here:
     - "Available Main" is a list of max-level guild members who are *not* currently in the Main PSK list.
@@ -42,14 +45,18 @@ Features:
       - A slight delay is added to prevent issues when the + button is clicked repeatedly.
       - The player will be added to the bottom of the selected list.
 
-
-- "Settings" tab:
-  - This tab will eventually allow managing settings for the addon.  
+<img width="894" alt="Main" src="https://github.com/user-attachments/assets/fca79556-c28b-40bb-bc7b-2de13708d5c4" />
 
 - "Logs" tab:
   - This tab will display the player, their class, the loot they received, and the date and time they received it. 
 
+<img width="893" alt="ImportExport" src="https://github.com/user-attachments/assets/114b7e27-64b3-4432-91f0-923efa7de821" />
 
+- "Import/Export" tab:
+  - To export data (for importing) from the addon, click the "Export (PSK)" button.
+  - To import data (exported by PSK), click the "Import (PSK)" button after pasting in exported data.
+  - To import a comma-separated list of names (older version of addon), paste/type them in, then click "Import (Old)".
+  - To export lists for pasting into Discord (or elsewhere), click "Export (Discord)".
   
 
 Commands:
