@@ -1472,23 +1472,31 @@ end
 -------------------------------------------
 
 local lastSent = {}
+local chunkTimers = {}
+local MAX_CHUNKS = 5
+local BASE_DELAY = 0.25
+local SYNC_QUEUE = {
+    UPDATE_BIDS      = 0,
+	UPDATE_MAIN_LIST = 1,
+    UPDATE_TIER_LIST = 2,
+    UPDATE_LOOT      = 3,    
+}
 
 function PSK:SendSync(msgType, data)
-	
-	local now = GetTime()
-	
-    if lastSent[msgType] and now - lastSent[msgType] < .5 then
-		if msgType ~= "UPDATE_BIDS" then
-			print("[PSK] Throttling SendSync for", msgType)
-			return
-		end
+
+	local syncOffset = SYNC_QUEUE[msgType] or 0
+
+    local now = GetTime()
+    if lastSent[msgType] and now - lastSent[msgType] < 0.5 then
+        if msgType ~= "UPDATE_BIDS" then
+            -- print("[PSK] Throttling SendSync for", msgType)
+            return
+        end
     end
-	
     lastSent[msgType] = now
-	
+
     local LibSerialize = LibStub("LibSerialize")
     local LibDeflate = LibStub("LibDeflate")
-
     local serialized = LibSerialize:Serialize(data)
     local compressed = LibDeflate:CompressZlib(serialized)
     local encoded = LibDeflate:EncodeForPrint(compressed)
@@ -1496,35 +1504,28 @@ function PSK:SendSync(msgType, data)
     local maxLen = 220
     local totalChunks = math.ceil(#encoded / maxLen)
     local prefix = "PSK_SYNC"
-	
-	-- print(string.format("[PSK] SendSync triggered: %s, %d bytes", msgType, #encoded))
-	
-    -- Delay multiplier per message type
-    local delayOffset = 0
-	
-    if msgType == "UPDATE_MAIN_LIST" then delayOffset = 3
-    elseif msgType == "UPDATE_TIER_LIST" then delayOffset = 3
-    elseif msgType == "UPDATE_LOOT" then delayOffset = 3
-    elseif msgType == "UPDATE_BIDS" then 
-		delayOffset = 3
-		if not PSK.BidEntries or type(PSK.BidEntries) ~= "table" then
-			print("[PSK Client] BidEntries is nil or not a table.")
-			PSK.BidEntries = {}
-			return
-		end
-    end
 
+    local queueKey = msgType .. ":" .. now
+    chunkTimers[queueKey] = chunkTimers[queueKey] or 0
+
+	-- print(string.format("[PSK] Sending %s (%d chunks, total %d bytes)", msgType, totalChunks, #encoded))
+	
     for i = 1, totalChunks do
         local chunk = encoded:sub((i - 1) * maxLen + 1, i * maxLen)
         local chunkMessage = string.format("%s@@%d@@%d@@%s", msgType, i, totalChunks, chunk)
-		-- print(string.format("[PSK] Sending chunk %d/%d for %s: %d chars", i, totalChunks, msgType, #chunk))
+        
+		local sendAt = (syncOffset * MAX_CHUNKS + (i - 1)) * BASE_DELAY
+		-- print(string.format("[PSK] Queued %s chunk %d/%d at %.2fs", msgType, i, totalChunks, sendAt))
 
-        C_Timer.After(delayOffset + (i * 0.25), function()
-            -- C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "WHISPER", UnitName("player"))
-			C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "RAID")
-        end)
+
+		C_Timer.After((syncOffset * MAX_CHUNKS + (i - 1)) * BASE_DELAY, function()
+			-- C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "RAID")
+			C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "WHISPER", UnitName("player"))
+
+		end)
     end
 end
+
 
 
 PSK:DebouncedRefreshLogList()

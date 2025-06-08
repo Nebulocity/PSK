@@ -171,6 +171,7 @@ end)
 ----------------------------------------
 
 function PSK:StartBidding()
+	PSK:SendSync("UPDATE_BIDS", PSK.BidEntries)
     if PSK.BiddingOpen then return end
 		
 	if not PSK.SelectedItem then
