@@ -213,7 +213,7 @@ PSK.BidButton:SetScript("OnClick", function()
 	if PSK.BiddingOpen then
 		PSK.BidButton.Border.Pulse:Stop()
 		PSK.BidButton.Border:SetAlpha(1) -- Fully visible, not pulsing
-		PSK:CloseBidding()
+		-- PSK:CloseBidding()
 		PSK:CloseBidding(true)
 		
 		if PSK.Settings.buttonSoundsEnabled then

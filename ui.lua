@@ -546,8 +546,16 @@ C_Timer.After(0.1, function()
 	PSK:DebouncedRefreshAvailablePlayerLists()
 	PSK:DebouncedRefreshPlayerLists()
 	PSK:DebouncedRefreshLootList()
-	-- PSK:CreateImportExportSection()
 	PSK:DebouncedRefreshLogList()	
 	PSK:DebouncedRefreshBidList()
+	
+	-- Send broadcast
+	C_Timer.After(3, function()
+		PSK:SendSync("UPDATE_MAIN_LIST", PSKDB.MainList)
+		PSK:SendSync("UPDATE_TIER_LIST", PSKDB.TierList)
+		PSK:SendSync("UPDATE_LOOT", PSKDB.LootDrops)
+		-- PSK:SendSync("UPDATE_BIDS", PSK.BidEntries or {})
+	end)
+
 end)
 

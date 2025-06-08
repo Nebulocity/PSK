@@ -284,6 +284,7 @@ function PSK:CloseBidding(suppressRoll)
 	PSK.RollTimers = {}
 	PSK.RollTimerActive = false
 	wipe(PSK.RollResults)
+	
     PSK:RefreshBidList()
 
     if #PSK.BidEntries == 0 then
@@ -578,28 +579,6 @@ chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
 end)
 
 
--- local rollFrame = CreateFrame("Frame")
--- chatFrame:RegisterEvent("CHAT_MSG_SYSTEM")
-
--- chatFrame:SetScript("OnEvent", function(self, event, msg, sender)
-	-- -- Capture rolls during an active roll-off
-	-- if event == "CHAT_MSG_SYSTEM" and PSK.RollTimerActive then
-		-- local player, roll, low, high = string.match(msg, "^(%a+) rolls (%d+) %((%d+)%-(%d+)%)")
-		-- if player and roll and low and high then
-			-- if not PSK.RollResults then PSK.RollResults = {} end
-			-- PSK.RollResults[player] = {
-				-- roll = tonumber(roll),
-				-- min = tonumber(low),
-				-- max = tonumber(high),
-				-- timestamp = GetTime()
-			-- }
-			-- print(string.format("[PSK] Captured roll: %s rolled %s (%s-%s)", player, roll, low, high))
-		-- end
-	-- end
--- end)
-
-
-
 ------------------------------------------
 -- Cancel roll timers
 ------------------------------------------
@@ -687,15 +666,28 @@ function AddBid(name)
     end
 
     -- Add bid
-    table.insert(PSK.BidEntries, {
-        position = position or (#PSK.BidEntries + 1),
-        name = name,
-        class = class,
-        online = true,
-        inRaid = UnitInRaid(unit) ~= nil,
-        notListed = false,
-    })
+    -- table.insert(PSK.BidEntries, {
+        -- position = position or (#PSK.BidEntries + 1),
+        -- name = name,
+        -- class = class,
+        -- online = true,
+        -- inRaid = UnitInRaid(unit) ~= nil,
+        -- notListed = false,
+    -- })
+	
+	table.insert(PSK.BidEntries, {
+		position = position or (#PSK.BidEntries + 1),
+		name = name,
+		class = class,
+		online = true,
+		inRaid = UnitInRaid(unit) ~= nil,
+		notListed = false,
+		listType = PSK.CurrentList,     -- "Main" or "Tier"
+		listPosition = position or 9999 -- more explicit field for client use
+	})
 
+
+	PSK:SendSync("UPDATE_BIDS", PSK.BidEntries)
     PSK:RefreshBidList()
 end
 
@@ -784,10 +776,11 @@ function RetractBid(name)
     for i, entry in ipairs(PSK.BidEntries) do
         if entry.name == name then
             table.remove(PSK.BidEntries, i)
-            PSK:RefreshBidList()
-            return
+            break
         end
     end
+
+    PSK:RefreshBidList()
 end
 
 

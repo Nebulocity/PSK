@@ -3,6 +3,8 @@
 ---------------------------------------------------
 
 local PSK = select(2, ...)
+local LibSerialize = LibStub("LibSerialize")
+local LibDeflate = LibStub("LibDeflate")
 
 -- Debounce flags
 local refreshPlayerScheduled = false
@@ -232,6 +234,7 @@ function PerformAward(index)
 
     PSK:RefreshPlayerLists()
     PSK:RefreshBidList()
+	PSK:RefreshLootList()
     PlaySound(12867)
 end
 
@@ -358,102 +361,6 @@ end
 function PSK:SafeAmbiguate(name)
     return name and Ambiguate(name, "short") or ""
 end
-
-
-
--- function PSK:ReorderListOnAward(listName, awardedPlayer)
-    -- local list = (listName == "Tier") and PSKDB.TierList or PSKDB.MainList
-    -- if not list then return end
-
-	-- print("Reordering %s list after awarding to: %s", listName, awardedPlayer)
-	
-    -- -- Get a lookup of all raid members
-    -- local raidRoster = {}
-    -- for i = 1, GetNumGroupMembers() do
-        -- local name = GetRaidRosterInfo(i)
-        -- if name then
-            -- local baseName = Ambiguate(name, "short")
-            -- raidRoster[baseName] = true
-        -- end
-    -- end
-
-    -- -- Build categorized lists
-    -- local inRaid = {}
-    -- local notInRaid = {}
-
-    -- -- Preserve order while separating raid members and non-raid
-    -- for i = 1, #list do
-        -- local name = list[i]
-        -- if name == awardedPlayer then
-            -- -- Skip for now (we’ll reinsert them)
-			-- print("Skipping awarded player: %s", name)
-        -- elseif raidRoster[name] then
-			-- -- If they're in the raid (raidRoster[name] = true
-            -- table.insert(inRaid, name)
-			-- print("In-raid member kept: %s", name)
-        -- else
-			-- -- If they're not in the raid (raidRoster[name] = false
-            -- table.insert(notInRaid, name)
-			-- print("Non-raid member preserved: %s", name)
-        -- end
-    -- end
-
-    -- -- Add awarded player to bottom of inRaid list
-    -- table.insert(inRaid, awardedPlayer)
-	-- print("Awarded player added to bottom of raid list: %s", awardedPlayer)
-	
-	
-    -- -- Merge back: interweave non-raiders into their original positions
-    -- local newList = {}
-    -- local raidIndex, nonRaidIndex = 1, 1
-    -- for i = 1, #list do
-        -- local expectedName = list[i]
-        -- local isInRaid = raidRoster[expectedName]
-        -- local nextRaid = inRaid[raidIndex]
-        -- local nextNonRaid = notInRaid[nonRaidIndex]
-
-        -- if not isInRaid and nextNonRaid == expectedName then
-            -- table.insert(newList, nextNonRaid)
-			-- print("Added non-raid: %s", nextNonRaid)
-            -- nonRaidIndex = nonRaidIndex + 1
-        -- elseif isInRaid and nextRaid then
-            -- table.insert(newList, nextRaid)
-			-- print("Added raid member: %s", nextRaid)
-            -- raidIndex = raidIndex + 1
-        -- elseif nextNonRaid then
-            -- -- Tie breaker: non-raid loses
-            -- table.insert(newList, nextNonRaid)
-			-- print("Added raid member: %s", nextRaid)
-            -- nonRaidIndex = nonRaidIndex + 1
-        -- end
-    -- end
-
-    -- -- Fallback in case of mismatch
-    -- while raidIndex <= #inRaid do
-        -- table.insert(newList, inRaid[raidIndex])
-		-- print("Added remaining raid member: %s", inRaid[raidIndex])
-        -- raidIndex = raidIndex + 1
-    -- end
-	
-    -- while nonRaidIndex <= #notInRaid do
-        -- table.insert(newList, notInRaid[nonRaidIndex])
-		-- print("Added remaining non-raid: %s", notInRaid[nonRaidIndex])
-        -- nonRaidIndex = nonRaidIndex + 1
-    -- end
-
-	-- print("New %s list order:", listName)
-    -- for i, name in ipairs(newList) do
-        -- print("  %d. %s", i, name)
-    -- end
-	
-    -- -- Save result
-    -- if listName == "Tier" then
-        -- PSKDB.TierList = newList
-    -- else
-        -- PSKDB.MainList = newList
-    -- end
-	
--- end
 
 
 ----------------------------------------------
@@ -620,7 +527,8 @@ function PSK:RefreshLootList()
 
     header:SetText("Loot Drops (" .. #PSKDB.LootDrops .. ")")
 
-    -- PSK:BroadcastUpdate("RefreshLootList")
+	-- Send broadcast
+	PSK:SendSync("UPDATE_LOOT", PSKDB.LootDrops)
 end
 
 
@@ -1034,63 +942,11 @@ function PSK:RefreshPlayerLists()
 			pool[i]:Hide()
 		end
 	end
-	
-	-- if not PSK.SelectedPlayer then
-		-- PSK.MoveUpButton:Hide()
-		-- PSK.MoveDownButton:Hide()
-	-- end
 
-
-	-- Broadcast update
-	-- SK:BroadcastUpdate("RefreshPlayerList")
+	-- Send broadcast
+	PSK:SendSync("UPDATE_MAIN_LIST", PSKDB.MainList)
+	PSK:SendSync("UPDATE_TIER_LIST", PSKDB.TierList)
 end
-
-
---------------------------------------------------------
--- Update player databases to ensure data is up to date
---------------------------------------------------------
--- function PSK:UpdatePlayerData()
-    -- if not PSKDB.Players then
-        -- PSKDB.Players = {}
-    -- end
-
-    -- for i = 1, GetNumGuildMembers() do
-        -- local fullName, _, _, level, _, _, _, _, online, _, classFileName = GetGuildRosterInfo(i)
-        -- local shortName = Ambiguate(fullName or "", "short")
-        -- local class = classFileName or "SHAMAN"
-
-        -- -- Ensure the player data is stored
-        -- if not PSKDB.Players[shortName] then
-            -- PSKDB.Players[shortName] = {
-                -- class = class,
-                -- online = online,
-                -- inRaid = false,
-                -- level = level,
-                -- zone = "Unknown",
-            -- }
-        -- end
-
-        -- -- Update online status
-        -- PSKDB.Players[shortName].online = online
-
-        -- -- Check if the player is in your current raid
-        -- if IsInRaid() then
-            -- for j = 1, GetNumGroupMembers() do
-                -- local unit = "raid" .. j
-                -- if UnitName(unit) == shortName then
-                    -- PSKDB.Players[shortName].inRaid = true
-                    -- PSKDB.Players[shortName].online = true
-                    -- break
-                -- else
-                    -- PSKDB.Players[shortName].inRaid = false
-                -- end
-            -- end
-        -- else
-            -- PSKDB.Players[shortName].inRaid = false
-        -- end
-    -- end
--- end
-
 
 
 ---------------------------------------------------
@@ -1484,82 +1340,11 @@ function PSK:RefreshBidList()
     for i = #PSK.BidEntries + 1, #pool do
         if pool[i] then pool[i]:Hide() end
     end
+	
+	-- Send broadcast
+	PSK:SendSync("UPDATE_BIDS", PSK.BidEntries)
 end
 
-
-
-
--------------------------------------------
--- Refresh member data when group changes.
--------------------------------------------
-
--- function PSK:RefreshGroupMemberData()
-    -- local function updateIfNeeded(unit)
-        -- if not UnitExists(unit) then return end
-
-        -- local name = Ambiguate(UnitName(unit), "short")
-        -- if not name then return end
-
-        -- local listed = false
-        -- for _, n in ipairs(PSKDB.MainList) do
-            -- if Ambiguate(n, "short") == name then
-                -- listed = true
-                -- break
-            -- end
-        -- end
-        -- for _, n in ipairs(PSKDB.TierList) do
-            -- if Ambiguate(n, "short") == name then
-                -- listed = true
-                -- break
-            -- end
-        -- end
-
-        -- if not listed then return end
-
-        -- local data = PSKDB.Players[name]
-		-- local needsUpdate = false
-
-		-- if not data then
-			-- needsUpdate = true
-		-- else
-			-- if data.class == "UNKNOWN" or data.class == "SHAMAN" then
-				-- needsUpdate = true
-			-- elseif data.level == "???" or not tonumber(data.level) then
-				-- needsUpdate = true
-			-- end
-		-- end
-
-
-        -- if needsUpdate then
-            -- local _, class = UnitClass(unit)
-            -- local level = UnitLevel(unit)
-            -- local zone = GetZoneText()
-            -- local online = UnitIsConnected(unit)
-            -- local inRaid = UnitInRaid(unit) ~= nil
-
-            -- PSKDB.Players[name] = {
-                -- class = class or "UNKNOWN",
-                -- level = level or "???",
-                -- zone = zone or "Unknown",
-                -- online = online or false,
-                -- inRaid = inRaid,
-            -- }
-
-            -- PSK:DebouncedRefreshPlayerLists()
-        -- end
-    -- end
-
-    -- if IsInRaid() then
-        -- for i = 1, MAX_RAID_MEMBERS do
-            -- updateIfNeeded("raid" .. i)
-        -- end
-    -- elseif IsInGroup() then
-        -- for i = 1, GetNumGroupMembers() - 1 do
-            -- updateIfNeeded("party" .. i)
-        -- end
-        -- updateIfNeeded("player") -- also update the user themselves if listed
-    -- end
--- end
 
 
 ------------------------------------------------
@@ -1680,70 +1465,66 @@ function PSK:DebouncedRefreshLogList()
     end)
 end
 
--------------------------------------------
--- Logging function
--------------------------------------------
-
--- function print(msg, ...)
-	-- if PSK.Settings and PSK.Settings.debugEnabled then
-		-- print("[PSK DEBUG]    ", string.format(msg, ...))
-	-- end
--- end
-
-
-
---------------------------------------------
--- Update last raid date
---------------------------------------------
-
--- function PSK:UpdateLastRaidDate(playerName)
-	-- local function update(list)
-		-- for _, entry in ipairs(list) do
-			-- if entry.name == playerName then
-				-- entry.dateLastRaided = date("%m-%d-%Y")
-				-- return
-			-- end
-		-- end
-	-- end
-	
-	-- update(PSKDB.MainList)
-	-- update(PSKDB.TierList)
--- end
-
-
-
-------------------------------
--- Converts table name entry
-------------------------------
-
--- function PSK:GetName(entry)
-    -- return type(entry) == "table" and entry.name or entry
--- end
-
-
--------------------------------------------
--- Serialize Data
--------------------------------------------
-
--- function PSK:Serialize(tbl)
-	-- return table.concat( { tbl.type, tbl.timestamp }, "|")
 
 
 -------------------------------------------
 -- Broadcast Update
 -------------------------------------------
 
--- function PSK:BroadcastUpdate(eventType)
-	-- local payload = {
-		-- type = eventType,
-		-- timestamp = time()
-	-- }
+local lastSent = {}
+
+function PSK:SendSync(msgType, data)
 	
-	-- local message = PSK:Serialize(payload)
+	local now = GetTime()
 	
-	-- C_ChatInfo.SendAddonMessage(PSK.PSK_PREFIX, message, "GUILD") -- RAID, PARTY, and WHISPER work also
+    if lastSent[msgType] and now - lastSent[msgType] < .5 then
+		if msgType ~= "UPDATE_BIDS" then
+			print("[PSK] Throttling SendSync for", msgType)
+			return
+		end
+    end
 	
--- end
+    lastSent[msgType] = now
+	
+    local LibSerialize = LibStub("LibSerialize")
+    local LibDeflate = LibStub("LibDeflate")
+
+    local serialized = LibSerialize:Serialize(data)
+    local compressed = LibDeflate:CompressZlib(serialized)
+    local encoded = LibDeflate:EncodeForPrint(compressed)
+
+    local maxLen = 220
+    local totalChunks = math.ceil(#encoded / maxLen)
+    local prefix = "PSK_SYNC"
+	
+	-- print(string.format("[PSK] SendSync triggered: %s, %d bytes", msgType, #encoded))
+	
+    -- Delay multiplier per message type
+    local delayOffset = 0
+	
+    if msgType == "UPDATE_MAIN_LIST" then delayOffset = 3
+    elseif msgType == "UPDATE_TIER_LIST" then delayOffset = 3
+    elseif msgType == "UPDATE_LOOT" then delayOffset = 3
+    elseif msgType == "UPDATE_BIDS" then 
+		delayOffset = 3
+		if not PSK.BidEntries or type(PSK.BidEntries) ~= "table" then
+			print("[PSK Client] BidEntries is nil or not a table.")
+			PSK.BidEntries = {}
+			return
+		end
+    end
+
+    for i = 1, totalChunks do
+        local chunk = encoded:sub((i - 1) * maxLen + 1, i * maxLen)
+        local chunkMessage = string.format("%s@@%d@@%d@@%s", msgType, i, totalChunks, chunk)
+		-- print(string.format("[PSK] Sending chunk %d/%d for %s: %d chars", i, totalChunks, msgType, #chunk))
+
+        C_Timer.After(delayOffset + (i * 0.25), function()
+            -- C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "WHISPER", UnitName("player"))
+			C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "RAID")
+        end)
+    end
+end
 
 
 PSK:DebouncedRefreshLogList()
