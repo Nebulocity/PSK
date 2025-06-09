@@ -1199,7 +1199,7 @@ function PSK:RefreshBidList()
     PSK.RowPool[scrollChild] = PSK.RowPool[scrollChild] or {}
     local pool = PSK.RowPool[scrollChild]
 
-    local bidCount = #PSK.BidEntries
+    local bidCount = #PSK.BidEntries or 0
     header:SetText("Bids (" .. bidCount .. ")")
 
     -- Wipe visible list
@@ -1466,6 +1466,33 @@ function PSK:DebouncedRefreshLogList()
 end
 
 
+-------------------------------------------
+-- PING/ACK Clients
+-------------------------------------------
+
+C_ChatInfo.RegisterAddonMessagePrefix("PSK_SYNC_PING")
+C_ChatInfo.RegisterAddonMessagePrefix("PSK_SYNC_ACK")
+C_ChatInfo.RegisterAddonMessagePrefix("PSK_SYNC")
+
+local PSKClients = {}  -- [playerName] = lastSeen timestamp
+local CLIENT_TIMEOUT = 300  -- 5 mins in seconds
+
+C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "RAID")
+
+C_Timer.NewTicker(60, function()
+	-- print("[PSK Master] Ping sent!")
+    C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "RAID")
+end)
+
+local f = CreateFrame("Frame")
+f:RegisterEvent("CHAT_MSG_ADDON")
+
+f:SetScript("OnEvent", function(_, _, prefix, message, channel, sender)
+    if prefix == "PSK_SYNC_ACK" then
+        PSKClients[sender] = GetTime()
+        -- print("[PSK Master] Client acknowledged:", sender)
+    end
+end)
 
 -------------------------------------------
 -- Broadcast Update
@@ -1473,13 +1500,14 @@ end
 
 local lastSent = {}
 local chunkTimers = {}
-local MAX_CHUNKS = 5
-local BASE_DELAY = 0.25
+local MAX_CHUNKS = 8
+local BASE_DELAY = 0.35
 local SYNC_QUEUE = {
     UPDATE_BIDS      = 0,
-	UPDATE_MAIN_LIST = 1,
-    UPDATE_TIER_LIST = 2,
-    UPDATE_LOOT      = 3,    
+	UPDATE_LOOT      = 1,
+	UPDATE_MAIN_LIST = 2,
+    UPDATE_TIER_LIST = 3,
+    
 }
 
 function PSK:SendSync(msgType, data)
@@ -1493,6 +1521,7 @@ function PSK:SendSync(msgType, data)
             return
         end
     end
+	
     lastSent[msgType] = now
 
     local LibSerialize = LibStub("LibSerialize")
@@ -1515,13 +1544,17 @@ function PSK:SendSync(msgType, data)
         local chunkMessage = string.format("%s@@%d@@%d@@%s", msgType, i, totalChunks, chunk)
         
 		local sendAt = (syncOffset * MAX_CHUNKS + (i - 1)) * BASE_DELAY
-		-- print(string.format("[PSK] Queued %s chunk %d/%d at %.2fs", msgType, i, totalChunks, sendAt))
-
+		
+		-- if msgType == "UPDATE_LOOT" then
+			-- print(string.format("[PSK] Queued %s chunk %d/%d at %.2fs", msgType, i, totalChunks, sendAt))
+		-- end
 
 		C_Timer.After((syncOffset * MAX_CHUNKS + (i - 1)) * BASE_DELAY, function()
-			-- C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "RAID")
-			C_ChatInfo.SendAddonMessage(prefix, chunkMessage, "WHISPER", UnitName("player"))
-
+			for clientName, lastSeen in pairs(PSKClients) do
+				if GetTime() - lastSeen < CLIENT_TIMEOUT then
+					C_ChatInfo.SendAddonMessage("PSK_SYNC", chunkMessage, "WHISPER", clientName)
+				end
+			end
 		end)
     end
 end
