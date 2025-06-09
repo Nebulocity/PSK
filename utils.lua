@@ -1477,11 +1477,11 @@ C_ChatInfo.RegisterAddonMessagePrefix("PSK_SYNC")
 local PSKClients = {}  -- [playerName] = lastSeen timestamp
 local CLIENT_TIMEOUT = 300  -- 5 mins in seconds
 
-C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "RAID")
+C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "GUILD")
 
 C_Timer.NewTicker(60, function()
-	-- print("[PSK Master] Ping sent!")
-    C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "RAID")
+	print("[PSK Master] Ping sent!")
+    C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "GUILD")
 end)
 
 local f = CreateFrame("Frame")
@@ -1490,7 +1490,7 @@ f:RegisterEvent("CHAT_MSG_ADDON")
 f:SetScript("OnEvent", function(_, _, prefix, message, channel, sender)
     if prefix == "PSK_SYNC_ACK" then
         PSKClients[sender] = GetTime()
-        -- print("[PSK Master] Client acknowledged:", sender)
+        print("[PSK Master] Client acknowledged:", sender)
     end
 end)
 
@@ -1507,7 +1507,6 @@ local SYNC_QUEUE = {
 	UPDATE_LOOT      = 1,
 	UPDATE_MAIN_LIST = 2,
     UPDATE_TIER_LIST = 3,
-    
 }
 
 function PSK:SendSync(msgType, data)
