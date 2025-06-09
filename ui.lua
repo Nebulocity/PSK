@@ -42,7 +42,7 @@ table.insert(UISpecialFrames, "PSKMainFrame")
 
 PSK.MainFrame.title = PSK.MainFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 PSK.MainFrame.title:SetPoint("CENTER", PSK.MainFrame.TitleBg, "CENTER", 0, 0)
-PSK.MainFrame.title:SetText("Perchance PSK - Perchance Some Loot?")
+PSK.MainFrame.title:SetText("Perchance Loot Master - Perchance Some Loot?")
 
 ------------------------
 -- Tabbed content frames

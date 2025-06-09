@@ -1,4 +1,4 @@
-## Interface: 11505
+## Interface: 11507
 ## Title: PSK - Perchance Some Loot?
 ## Notes: Loot tracking and player roster manager for Perchance (Nightslayer-US)
 ## Version: 1.0
