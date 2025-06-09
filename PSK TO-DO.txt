@@ -1,3 +1,7 @@
+- Ping includes listVersion and lastUpdated timestamp.
+- Manual takeover command: /psktakeover.
+  - Broadcasts to all masters.
+  - Masters can respond with /pskaccept or /pskdeny
 
 
 
