@@ -11,6 +11,7 @@
 Libs\LibStub\LibStub.lua
 Libs\LibSerialize\LibSerialize.lua
 Libs\LibDeflate\LibDeflate.lua
+Libs\AceComm-3.0\AceComm-3.0.lua
 
 media\icon.tga
 

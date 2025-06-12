@@ -187,19 +187,6 @@ end)
 
 
 ------------------------------
--- Display Rarity
-------------------------------
-
--- PSK.LootLabel = PSK.ContentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
--- PSK.LootLabel:SetPoint("RIGHT", PSK.ClearLootButton, "LEFT", -5, -1)
--- local threshold = PSK.Settings.lootThreshold or 3
--- local color = PSK.RarityColors[threshold] or "ffffff"
--- local name = PSK.RarityNames[threshold] or "Rare"
-
--- PSK.LootLabel:SetText("|cff" .. color .. name .. "+|r")
-
-
-------------------------------
 -- Button to start bidding
 ------------------------------
 
@@ -315,6 +302,7 @@ importTierButton:SetText("Import (PSK)")
 importTierButton:SetScript("OnClick", function()
     local json = PSK.TierListEditBox:GetText()
     PSK:ImportPSKTierList(json)
+	PSK.TierListEditBox:SetText("")
 end)
 
 
@@ -329,6 +317,7 @@ importOldMainButton:SetText("Import (Old)")
 importOldMainButton:SetScript("OnClick", function()
 	local text = PSK.MainListEditBox:GetText()
 	PSK:ImportOldPSKMainList(text)
+	PSK.MainListEditBox:SetText("")
 end)
 
 --------------------------------
@@ -342,6 +331,7 @@ importOldTierButton:SetText("Import (Old)")
 importOldTierButton:SetScript("OnClick", function()
 	local text = PSK.TierListEditBox:GetText()
 	PSK:ImportOldPSKTierList(text)
+	PSK.TierListEditBox:SetText("")
 end)
 
 
@@ -424,4 +414,36 @@ importMainButton:SetText("Import (PSK)")
 importMainButton:SetScript("OnClick", function()
     local json = PSK.MainListEditBox:GetText()
     PSK:ImportPSKMainList(json)
+	PSK.MainListEditBox:SetText("")
+end)
+
+
+
+--------------------------------
+-- Loot Drops in case LM leaves
+--------------------------------
+
+
+-- Export Loot Drops Button
+local exportLootButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+exportLootButton:SetSize(120, 30)
+exportLootButton:SetPoint("TOPRIGHT", PSK.ImportExportFrame, "TOPRIGHT", -65, -20)
+exportLootButton:SetText("Export Loot")
+exportLootButton:SetScript("OnClick", function()
+	local encoded = PSK:ExportPSKLootDrops()
+	PSK.TierListEditBox:SetText(encoded)
+	PSK.TierListEditBox:HighlightText()
+	PSK.TierListEditBox:SetFocus()
+	print("[PSK] Loot Drops Exported.")
+end)
+
+-- Import Loot Drops Button
+local importLootButton = CreateFrame("Button", nil, PSK.ImportExportFrame, "UIPanelButtonTemplate")
+importLootButton:SetSize(120, 30)
+importLootButton:SetPoint("TOPLEFT", PSK.ImportExportFrame, "TOPLEFT", 30, -20)
+importLootButton:SetText("Import Loot")
+importLootButton:SetScript("OnClick", function()
+	local text = PSK.TierListEditBox:GetText()
+	PSK:ImportPSKLootDrops(text)
+	PSK.TierListEditBox:SetText("")
 end)

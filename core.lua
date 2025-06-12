@@ -48,6 +48,10 @@ PSK.BidEntries = {}
 PSK.CurrentList = "Main"
 PSK.RollResults = PSK.RollResults or {}
 PSK.ManualCancel = false
+PSK.BidType = "Bid"
+PSK.ItemWentToRoll = false
+PSKDB.LastUpdated = PSKDB.LastUpdated or 0
+
 
 -- Holds timer references, so they can be started/stopped manually.
 PSK.BidTimers = {}
@@ -91,10 +95,10 @@ local lootViewFrame = CreateFrame("Frame")
 lootViewFrame:RegisterEvent("LOOT_OPENED")
 
 lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
-
+	
     -- if not IsMasterLooter() then return end
     if not PSK.Settings or not PSK.Settings.lootThreshold then return end
-
+	
     local numItems = GetNumLootItems()
     local lootLinks = {}
 
@@ -110,7 +114,7 @@ lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 				
                 if rarity and rarity >= PSK.Settings.lootThreshold then
 				
-					if not PSK:IsLootAlreadyRecorded(itemLink) then
+					-- if not PSK:IsLootAlreadyRecorded(itemLink) then
 						local itemLink = GetLootSlotLink(i)
 						local texture = GetLootSlotInfo(i) 
 
@@ -125,7 +129,7 @@ lootViewFrame:SetScript("OnEvent", function(self, event, autoLoot)
 								timestamp = date("%Y-%m-%d %H:%M:%S"),
 							})
 						end
-					end
+					-- end
                 end
             end
         end
@@ -186,6 +190,7 @@ function PSK:StartBidding()
 	end
 
     PSK.BiddingOpen = true
+	PSK.BidType = "Bid"
 	
 	-- Clear old timers just in case
 	PSK.BidTimers = {}
@@ -298,6 +303,7 @@ function PSK:CloseBidding(suppressRoll)
 			-- Start 20 second timer
 			PSK.RollTimerActive = true
 			PSK.BiddingOpen = false
+			PSK.BidType = "Roll"
 			
 			local rollTimer = C_Timer.After(20, function()
 				PSK:EvaluateRolls(itemLink)

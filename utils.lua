@@ -68,13 +68,15 @@ function PSK:AwardPlayer(index)
     end
 
     -- Step 1: Confirm with the user first
+	local safeIndex = index  -- capture the value
+	
     StaticPopupDialogs["PSK_CONFIRM_AWARD"] = {
         text = "Are you sure you want to award loot to |cffffff00%s|r?",
         button1 = "Yes",
         button2 = "No",
         OnAccept = function()
             -- Award confirmed
-            PerformAward(index)
+            PerformAward(safeIndex)
         end,
         timeout = 0,
         whileDead = true,
@@ -85,6 +87,25 @@ function PSK:AwardPlayer(index)
     StaticPopup_Show("PSK_CONFIRM_AWARD", playerName)
 end
 
+
+--------------------------------------------
+-- update date last raided for all raiders
+--------------------------------------------
+
+function PSK:UpdateRaidersDateLastRaided(list)
+	for _, entry in ipairs(list) do
+		for i = 1, MAX_RAID_MEMBERS do
+			local unit = "raid" .. i
+			if UnitExists(unit) then
+				local name = Ambiguate(UnitName(unit), "short")
+				if name == entry.name then
+					entry.dateLastRaided = now
+					break
+				end
+			end
+		end
+	end
+end
 
 ---------------------------------
 -- Perform the award
@@ -137,37 +158,23 @@ function PerformAward(index)
         PSK:DebouncedRefreshLootList()
     end
 
-	-- Reorder standings based on current list and selected player
-	if PSK.SelectedPlayer then
-		PSK:ReorderListOnAward(PSK.CurrentList)
-		
-		-- Update dateLastRaided for all raid members in the Main or Tier list
-		local now = date("%m/%d/%Y")
-
-		local function updateRaidersDateLastRaided(list)
-			for _, entry in ipairs(list) do
-				for i = 1, MAX_RAID_MEMBERS do
-					local unit = "raid" .. i
-					if UnitExists(unit) then
-						local name = Ambiguate(UnitName(unit), "short")
-						if name == entry.name then
-							entry.dateLastRaided = now
-							break
-						end
-					end
-				end
-			end
+	if PSK.BidType == "Bid" then
+		-- Reorder standings based on current list and selected player
+		if PSK.SelectedPlayer then
+			PSK:ReorderListOnAward(PSK.CurrentList)
+			
+			-- Update dateLastRaided for all raid members in the Main or Tier list
+			local now = date("%m/%d/%Y")
+		else
+			print("[PSK] Error: No selected player found to reorder list.")
 		end
-
-		if PSKDB.MainList then
-			updateRaidersDateLastRaided(PSKDB.MainList)
-		end
-		if PSKDB.TierList then
-			updateRaidersDateLastRaided(PSKDB.TierList)
-		end
-
-	else
-		print("[PSK] Error: No selected player found to reorder list.")
+	end
+	
+	if PSKDB.MainList then
+		PSK:UpdateRaidersDateLastRaided(PSKDB.MainList)
+	end
+	if PSKDB.TierList then
+		PSK:UpdateRaidersDateLastRaided(PSKDB.TierList)
 	end
 
 	-- Clear bidders after awarding
@@ -209,23 +216,22 @@ function PerformAward(index)
 
 
     -- Remove from visible + persistent loot lists
-    local itemLinkToRemove = item.itemLink
-	local textureToRemove = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark"
-	local timestampToRemove = item.timestamp
+    -- local itemLinkToRemove = item.itemLink
+	-- local textureToRemove = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark"
+	-- local timestampToRemove = item.timestamp
 	
-	local function removeItemFromList(list)
-		for i = #list, 1, -1 do
-			local entry = list[i]
+	-- local function removeItemFromList(list)
+		-- for i = #list, 1, -1 do
+			-- local entry = list[i]
 
-			if entry.itemLink == itemLinkToRemove and entry.timestamp == timestampToRemove then
-				print(">>> Match found — removing loot entry.")
-				table.remove(list, i)
-				break
-			end
-		end
-	end
+			-- if entry.itemLink == itemLinkToRemove and entry.timestamp == timestampToRemove then
+				-- table.remove(list, i)
+				-- break
+			-- end
+		-- end
+	-- end
 
-	removeItemFromList(PSKDB.LootDrops)
+	-- removeItemFromList(PSKDB.LootDrops)
 
 
     if PSK.RefreshLogList then
@@ -343,6 +349,9 @@ function PSK:ReorderListOnAward(listName)
         end
     end
 
+	-- Update time the lists were last updated
+	PSKDB.LastUpdated = time()
+	
     -- DEBUG: Announce movements
     -- PSK:Announce("---- [PSK] List Reordered ----")
     -- if #diff == 0 then
@@ -536,14 +545,14 @@ end
 -- Helper function for looting
 ----------------------------------------
 
-function PSK:IsLootAlreadyRecorded(itemLink)
-    for _, entry in ipairs(PSKDB.LootDrops or {}) do
-        if entry.itemLink == itemLink then
-            return true
-        end
-    end
-    return false
-end
+-- function PSK:IsLootAlreadyRecorded(itemLink)
+    -- for _, entry in ipairs(PSKDB.LootDrops or {}) do
+        -- if entry.itemLink == itemLink then
+            -- return true
+        -- end
+    -- end
+    -- return false
+-- end
 
 
 
@@ -1275,7 +1284,10 @@ function PSK:RefreshBidList()
             row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             row.nameText:SetPoint("LEFT", row.classIcon, "RIGHT", 4, 0)
         end
-        row.nameText:SetText(bidData.name)
+		
+		local listType = bidData.listType or "?"
+		local listPos = bidData.listPosition or "??"
+		row.nameText:SetText(string.format("%s (#%s)", bidData.name or "?", listPos))
 
 
         -- Award Button
@@ -1340,6 +1352,8 @@ function PSK:RefreshBidList()
     for i = #PSK.BidEntries + 1, #pool do
         if pool[i] then pool[i]:Hide() end
     end
+	
+	
 	
 	-- Send broadcast
 	PSK:SendSync("UPDATE_BIDS", PSK.BidEntries)
@@ -1476,21 +1490,29 @@ C_ChatInfo.RegisterAddonMessagePrefix("PSK_SYNC")
 
 local PSKClients = {}  -- [playerName] = lastSeen timestamp
 local CLIENT_TIMEOUT = 300  -- 5 mins in seconds
+local payload = "HELLO::" .. tostring(PSKDB.LastUpdated)
 
-C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "GUILD")
-
-C_Timer.NewTicker(60, function()
-	print("[PSK Master] Ping sent!")
-    C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", "HELLO", "GUILD")
+local initialPingFrame = CreateFrame("Frame")
+initialPingFrame:RegisterEvent("PLAYER_LOGIN")
+initialPingFrame:SetScript("OnEvent", function(_, event, ...)
+	local payload = "HELLO::" .. tostring(PSKDB.LastUpdated or 0)
+	-- print("[PSK Master] Ping sent! Payload:", payload)
+	C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", payload, "GUILD")
 end)
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("CHAT_MSG_ADDON")
+C_Timer.NewTicker(60, function()
+	payload = "HELLO::" .. tostring(PSKDB.LastUpdated)
+	-- print("[PSK Master] Ping sent! Payload: " .. payload)
+    C_ChatInfo.SendAddonMessage("PSK_SYNC_PING", payload, "GUILD")
+end)
 
-f:SetScript("OnEvent", function(_, _, prefix, message, channel, sender)
+local masterAckFrame = CreateFrame("Frame")
+masterAckFrame:RegisterEvent("CHAT_MSG_ADDON")
+
+masterAckFrame:SetScript("OnEvent", function(_, _, prefix, message, channel, sender)
     if prefix == "PSK_SYNC_ACK" then
         PSKClients[sender] = GetTime()
-        print("[PSK Master] Client acknowledged:", sender)
+        -- print("[PSK Master] Client acknowledged:", sender)
     end
 end)
 
@@ -1508,6 +1530,15 @@ local SYNC_QUEUE = {
 	UPDATE_MAIN_LIST = 2,
     UPDATE_TIER_LIST = 3,
 }
+
+
+-- Periodically update the main/tier lists to handle dropped chunks
+C_Timer.NewTicker(15, function()
+	PSK:SendSync("UPDATE_MAIN_LIST", PSKDB.MainList)
+	PSK:SendSync("UPDATE_TIER_LIST", PSKDB.TierList)
+	-- print("[PSK] Main/Tier list update sent!")
+end)
+
 
 function PSK:SendSync(msgType, data)
 

@@ -6,7 +6,7 @@ local PSK = select(2, ...)
 ------------------------
 
 if not PSKDB then PSKDB = {} end
-PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 3 } -- default to 3 for rare
+PSKDB.Settings = PSKDB.Settings or { buttonSoundsEnabled = true, lootThreshold = 4 } -- default to 3 for rare
 PSK.Settings = CopyTable(PSKDB.Settings)
 -- local mainListCount = #PSKDB.MainList or 0
 local pskTabScrollFrameHeight = -115

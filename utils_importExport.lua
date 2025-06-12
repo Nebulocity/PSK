@@ -136,6 +136,8 @@ function PSK:ImportPSKTierList(encoded)
     if not success then print("Failed to deserialize") return end
 
     PSKDB.TierList = sanitizeList(data)
+	PSKDB.LastUpdated = time()
+	print("Time udpated: " .. PSKDB.LastUpdated)
     PSK:DebouncedRefreshPlayerLists()
     print("[PSK] Tier list successfully imported.")
 end
@@ -166,13 +168,15 @@ function PSK:ImportPSKMainList(encoded)
     if not success then print("Failed to deserialize") return end
 
     PSKDB.MainList = sanitizeList(data)
+	PSKDB.LastUpdated = time()
+	print("Time udpated: " .. PSKDB.LastUpdated)
     PSK:DebouncedRefreshPlayerLists()
     print("[PSK] Main list successfully imported.")
 end
 
 
 function PSK:ImportOldStyleList(text)
-	GuildRoster()  -- Request update, but don't rely on it immediately
+	GuildRoster()
 
 	local entries = {}
 
@@ -188,7 +192,9 @@ function PSK:ImportOldStyleList(text)
 			})
 		end
 	end
-
+	
+	PSKDB.LastUpdated = time()
+	
 	return entries
 end
 
@@ -200,6 +206,8 @@ end
 function PSK:ImportOldPSKMainList(text)
 	local data = PSK:ImportOldStyleList(text)
 	PSKDB.MainList = data
+	PSKDB.LastUpdated = time()
+	print("Time udpated: " .. PSKDB.LastUpdated)
 	PSK:DebouncedRefreshPlayerLists()
 	print("[PSK] Old-style Main list imported.")
 end
@@ -209,6 +217,44 @@ end
 function PSK:ImportOldPSKTierList(text)
 	local data = PSK:ImportOldStyleList(text)
 	PSKDB.TierList = data
+	PSKDB.LastUpdated = time()
+	print("Time udpated: " .. PSKDB.LastUpdated)
 	PSK:DebouncedRefreshPlayerLists()
 	print("[PSK] Old-style Tier list imported.")
+end
+
+
+-------------------------------------------------
+-- For Exporting/Importing loot drops 
+-------------------------------------------------
+
+
+function PSK:ExportPSKLootDrops()
+    local LibSerialize = LibStub("LibSerialize")
+    local LibDeflate = LibStub("LibDeflate")
+
+    local data = PSKDB.LootDrops or {}
+    local serialized = LibSerialize:Serialize(data)
+    local compressed = LibDeflate:CompressDeflate(serialized)
+    local encoded = LibDeflate:EncodeForPrint(compressed)
+
+    return encoded
+end
+
+function PSK:ImportPSKLootDrops(encoded)
+    local LibSerialize = LibStub("LibSerialize")
+    local LibDeflate = LibStub("LibDeflate")
+
+    local compressed = LibDeflate:DecodeForPrint(encoded)
+    if not compressed then print("[PSK] Invalid encoded string") return end
+
+    local serialized = LibDeflate:DecompressDeflate(compressed)
+    if not serialized then print("[PSK] Failed to decompress loot data") return end
+
+    local success, data = LibSerialize:Deserialize(serialized)
+    if not success then print("[PSK] Failed to deserialize loot data") return end
+
+    PSKDB.LootDrops = data or {}
+    PSK:DebouncedRefreshLootList()
+    print("[PSK] Loot drops successfully imported.")
 end
