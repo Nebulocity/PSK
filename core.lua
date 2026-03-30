@@ -1,6 +1,3 @@
--- core.lua
-
-
 local PSK = select(2, ...)
 
 -- Ensure PSKDB is initialized correctly
@@ -60,28 +57,6 @@ PSK.BidTimers = {}
 ----------------------------------------
 -- Zug zug
 ----------------------------------------
-
--- function PSK:PlayRandomPeonSound()
-    -- if not PSK.Settings or not PSK.Settings.buttonSoundsEnabled then
-        -- return false
-    -- end
-
-    -- local normalSounds = {
-        -- "Sound\\Creature\\Peon\\PeonYes1.ogg",
-        -- "Sound\\Creature\\Peon\\PeonYes2.ogg",
-    -- }
-    -- local rareSound = "Sound\\Creature\\Peon\\PeonWhat3.ogg"
-
-    -- if math.random(1, 100) <= 5 then
-        -- PlaySoundFile(rareSound)
-        -- return true
-    -- else
-        -- PlaySoundFile(normalSounds[math.random(1, #normalSounds)])
-        -- return false
-    -- end
--- end
-
-
 
 ----------------------------------------
 -- Record Loot 
@@ -400,7 +375,6 @@ function PSK:EvaluateRolls(itemLink)
 			PSK:Announce(string.format("[PSK] %s wins %s with a Main Spec roll of %d!", PSK.CapitalizeName(mainSpecWinners[1]), itemLink or "", highestMainRoll))
 		else
 			PSK:Announce(string.format("[PSK] Tie detected for Main Spec roll of %d between: %s", highestMainRoll, table.concat(mainSpecWinners, ", ")))
-			-- Optional: trigger a second roll-off among them or ask for a reroll
 		end
 	elseif #offSpecWinners > 0 then
 		if #offSpecWinners == 1 then
@@ -408,7 +382,6 @@ function PSK:EvaluateRolls(itemLink)
 			PSK:Announce(string.format("[PSK] %s wins %s with an Off Spec roll of %d!", PSK.CapitalizeName(offSpecWinners[1]), itemLink or "", highestOffRoll))
 		else
 			PSK:Announce(string.format("[PSK] Tie detected for Off Spec roll of %d between: %s", highestOffRoll, table.concat(offSpecWinners, ", ")))
-			-- Optional: trigger a second roll-off among them or ask for a reroll
 		end
 	else
 		PSK:Announce("[PSK] No valid rolls detected.")
@@ -444,7 +417,7 @@ end
 
 
 -------------------------------------------
--- Frame for updating PSK lists on update.
+-- Frame for updating PSK lists on update
 -------------------------------------------
 
 PSK.RosterFrame = CreateFrame("Frame")
@@ -673,15 +646,6 @@ function AddBid(name)
     end
 
     -- Add bid
-    -- table.insert(PSK.BidEntries, {
-        -- position = position or (#PSK.BidEntries + 1),
-        -- name = name,
-        -- class = class,
-        -- online = true,
-        -- inRaid = UnitInRaid(unit) ~= nil,
-        -- notListed = false,
-    -- })
-	
 	table.insert(PSK.BidEntries, {
 		position = position or (#PSK.BidEntries + 1),
 		name = name,
@@ -690,7 +654,7 @@ function AddBid(name)
 		inRaid = UnitInRaid(unit) ~= nil,
 		notListed = false,
 		listType = PSK.CurrentList,     -- "Main" or "Tier"
-		listPosition = position or 9999 -- more explicit field for client use
+		listPosition = position or 9999 
 	})
 
 
@@ -870,7 +834,7 @@ end
 function PSK:PrintHelp()
     print(" ")
     print("|cff00ff00[PSK Addon Help]|r")
-    print("/psk                     - Toggle the PSK window")
+    print("/psk                    - Toggle the PSK window")
     print("/pskhelp                - Show this help menu")
 	print("/pskadd <top or bottom> <main or tier> <name>    - Add player to a list")
 	print("/pskclear                - !!! CLEARS PSK LISTS - IRREVERSIBLE !!!")
@@ -903,12 +867,6 @@ StaticPopupDialogs["PSK_CONFIRM_CLEAR_LISTS"] = {
     hideOnEscape = true,
     preferredIndex = 3
 }
-
-
-----------------------------------------------
--- Capitalize names that get added to the lists
-----------------------------------------------
-
 function PSK.CapitalizeName(name)
     return name:sub(1, 1):upper() .. name:sub(2):lower()
 end
