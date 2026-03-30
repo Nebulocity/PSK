@@ -1,7 +1,6 @@
+#This project was abandoned as it wasn't necessary anymore.  But it was a good foray into WoW addon development and getting into some more complicated task tackling in Lua.
 
-Perchance PSK Addon.
-
-This addon tracks a "Main" and "Tier" list for KSK loot distribution standings.  
+This is an addon for the KSK Loot System used in World of Warcraft: The KSK randomly organizes players into a list (not in this addon, as they were already using it when I joined the guild).  The higher you are in the list, the higher your priority is for getting loot when something you want drops.  If an item drops and you want it, you "bid" your spot in the list, along with whoever else wants it.  Whoever is higher in list order has priority and gets the item.  They then go to the bottom of the list.  In this way, large groups of 40 players are all given priority over time, and can hold that priority until their loot drops.  This addon tracks a "Main" and "Tier" priority list.  This is like the old KSK addon, but meant to be better.
 
 An instructional video can be seen here: https://youtu.be/l_ZgQ-IcoAU
 
