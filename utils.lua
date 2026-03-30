@@ -214,26 +214,6 @@ function PerformAward(index)
 		timestamp = date("%I:%M%p %m/%d/%Y"),
 	})
 
-
-    -- Remove from visible + persistent loot lists
-    -- local itemLinkToRemove = item.itemLink
-	-- local textureToRemove = item.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark"
-	-- local timestampToRemove = item.timestamp
-	
-	-- local function removeItemFromList(list)
-		-- for i = #list, 1, -1 do
-			-- local entry = list[i]
-
-			-- if entry.itemLink == itemLinkToRemove and entry.timestamp == timestampToRemove then
-				-- table.remove(list, i)
-				-- break
-			-- end
-		-- end
-	-- end
-
-	-- removeItemFromList(PSKDB.LootDrops)
-
-
     if PSK.RefreshLogList then
         PSK:DebouncedRefreshLogList()
     end
